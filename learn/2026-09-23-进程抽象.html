@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026-09-23 · 第4章 抽象：进程 · 学习报告</title>
+<style>
+  :root {
+    --bg-deep: #0b0d12;
+    --bg-panel: #14171d;
+    --metal-1: #1c2028;
+    --metal-2: #262b35;
+    --metal-edge: rgba(255,255,255,0.08);
+    --text-main: #e8e9ec;
+    --text-dim: #9aa0ac;
+    --accent-rose: #e8b4bc;
+    --accent-gold: #d4af37;
+    --accent-blue: #7fb8e0;
+    --accent-green: #8fd0a8;
+    --accent-red: #e08f8f;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(232,180,188,0.06), transparent 40%),
+      radial-gradient(circle at 80% 10%, rgba(127,184,224,0.05), transparent 45%),
+      linear-gradient(180deg, #0a0c10 0%, #0b0d12 100%);
+    color: var(--text-main);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    padding: 40px 20px 100px;
+  }
+
+  .wrap { max-width: 900px; margin: 0 auto; }
+
+  /* ---- Header ---- */
+  header {
+    background: linear-gradient(145deg, var(--metal-2), var(--metal-1));
+    border: 1px solid var(--metal-edge);
+    border-radius: var(--radius);
+    padding: 32px 36px;
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  header::before {
+    content: "";
+    position: absolute;
+    top: -60%; left: -20%;
+    width: 140%; height: 200%;
+    background: linear-gradient(120deg, transparent 40%, rgba(255,255,255,0.04) 50%, transparent 60%);
+    pointer-events: none;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--accent-gold);
+    border: 1px solid rgba(212,175,55,0.4);
+    border-radius: 20px;
+    padding: 4px 14px;
+    margin-bottom: 14px;
+    background: rgba(212,175,55,0.08);
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    letter-spacing: 1px;
+    color: var(--text-main);
+  }
+  .subtitle { color: var(--text-dim); font-size: 15px; }
+  .meta-row {
+    margin-top: 18px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .meta-row b { color: var(--accent-rose); }
+
+  /* ---- Section shell ---- */
+  section {
+    background: linear-gradient(160deg, rgba(38,43,53,0.6), rgba(20,23,29,0.6));
+    border: 1px solid var(--metal-edge);
+    border-radius: var(--radius);
+    padding: 26px 30px;
+    margin-bottom: 22px;
+    backdrop-filter: blur(6px);
+  }
+  h2 {
+    font-size: 19px;
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--accent-rose);
+  }
+  h2 .num {
+    background: linear-gradient(145deg, var(--metal-2), var(--metal-1));
+    border: 1px solid var(--metal-edge);
+    border-radius: 8px;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--accent-gold);
+  }
+  h3 { color: var(--accent-blue); font-size: 15px; margin: 20px 0 10px; }
+  p { color: var(--text-main); }
+  .dim { color: var(--text-dim); font-size: 13.5px; }
+
+  /* ---- Knowledge map ---- */
+  .map-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+  }
+  .map-box {
+    border: 1px solid var(--metal-edge);
+    background: var(--metal-1);
+    border-radius: 10px;
+    padding: 12px 18px;
+    text-align: center;
+    font-size: 14px;
+    width: 100%;
+  }
+  .map-box.key { border-color: rgba(212,175,55,0.5); color: var(--accent-gold); }
+  .map-box.core { border-color: rgba(232,180,188,0.5); color: var(--accent-rose); font-weight: bold; }
+  .map-arrow { color: var(--text-dim); font-size: 13px; }
+  .split-row { display: flex; gap: 12px; width: 100%; }
+  .split-row .map-box { flex: 1; }
+
+  /* ---- Details / dictation check ---- */
+  details {
+    border: 1px solid var(--metal-edge);
+    background: rgba(255,255,255,0.02);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+  }
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--accent-blue);
+    list-style: none;
+  }
+  summary::before { content: "▸ "; color: var(--accent-gold); }
+  details[open] summary::before { content: "▾ "; }
+  details .answer {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--metal-edge);
+    color: var(--text-main);
+    font-size: 14px;
+  }
+  details .answer .pitfall {
+    color: var(--accent-red);
+    font-size: 13px;
+    margin-top: 6px;
+  }
+
+  /* ---- table ---- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin: 10px 0 16px;
+  }
+  th, td {
+    border: 1px solid var(--metal-edge);
+    padding: 8px 10px;
+    text-align: center;
+  }
+  th { background: var(--metal-2); color: var(--accent-gold); }
+  td.run { color: var(--accent-green); }
+  td.block { color: var(--accent-red); }
+  td.ready { color: var(--text-dim); }
+  td.note { text-align: left; color: var(--text-dim); font-size: 12.5px; }
+
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 12px;
+    margin-left: 8px;
+  }
+  .badge.A { background: rgba(212,175,55,0.15); color: var(--accent-gold); border: 1px solid rgba(212,175,55,0.4); }
+  .badge.B { background: rgba(127,184,224,0.15); color: var(--accent-blue); border: 1px solid rgba(127,184,224,0.4); }
+
+  ul.check { list-style: none; padding: 0; margin: 0; }
+  ul.check li {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--metal-edge);
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+  ul.check li .fix {
+    display: block;
+    color: var(--text-dim);
+    font-size: 12.5px;
+    margin-top: 4px;
+  }
+  ul.check li.hit { border-left: 3px solid var(--accent-red); }
+
+  /* ---- report grid ---- */
+  .report-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .report-card {
+    background: var(--metal-1);
+    border: 1px solid var(--metal-edge);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .report-card .label { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 6px; }
+  .report-card .value { font-size: 14.5px; color: var(--text-main); }
+
+  /* ---- timeline ---- */
+  .timeline { display: flex; flex-direction: column; gap: 10px; }
+  .tl-item {
+    display: flex; gap: 14px; align-items: flex-start;
+    border-left: 2px solid rgba(212,175,55,0.4);
+    padding-left: 16px; position: relative;
+  }
+  .tl-item::before {
+    content: "";
+    position: absolute; left: -6px; top: 4px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent-gold);
+    box-shadow: 0 0 8px rgba(212,175,55,0.6);
+  }
+  .tl-date { color: var(--accent-gold); font-size: 13px; min-width: 90px; }
+  .tl-body { font-size: 13.5px; color: var(--text-main); }
+
+  footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12.5px;
+    margin-top: 40px;
+  }
+
+  @media (max-width: 600px) {
+    .split-row { flex-direction: column; }
+    .report-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="tag">学习日期 · 2026-09-23</span>
+    <h1>第 4 章　抽象：进程</h1>
+    <div class="subtitle">来源：《操作系统导论》（OSTEP） · 学习目的：系统学习计算机基础</div>
+    <div class="meta-row">
+      <div>学习目标：<b>能默画进程三态转换图，说清操作系统为什么需要"进程"这个抽象</b></div>
+      <div>耗时：约 90 分钟</div>
+      <div>掌握层级：<span class="badge A">A层 5项</span><span class="badge B">B层 3项</span></div>
+    </div>
+  </header>
+
+  <!-- 1. 知识地图 -->
+  <section>
+    <h2><span class="num">1</span>知识地图</h2>
+    <div class="map-flow">
+      <div class="map-box key">关键问题：物理 CPU 很少，如何提供"有无数个 CPU 可用"的假象？</div>
+      <div class="map-arrow">↓ 答案</div>
+      <div class="map-box">虚拟化 CPU（virtualizing CPU） · 核心技术：时分共享 time sharing</div>
+      <div class="map-arrow">↓ 靠什么实现</div>
+      <div class="split-row">
+        <div class="map-box">机制 mechanism<br><span class="dim">回答 how · 例：上下文切换</span></div>
+        <div class="map-box">策略 policy<br><span class="dim">回答 which · 例：调度策略</span></div>
+      </div>
+      <div class="map-arrow">↓ 共同作用于</div>
+      <div class="map-box core">进程 process = 正在运行的程序</div>
+      <div class="split-row">
+        <div class="map-box">内存<br><span class="dim">地址空间：代码/静态数据/堆↑/栈↓</span></div>
+        <div class="map-box">寄存器<br><span class="dim">特殊：PC / SP / FP</span></div>
+        <div class="map-box">I/O 信息<br><span class="dim">打开的文件描述符</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 闭卷自测 -->
+  <section>
+    <h2><span class="num">2</span>核心概念闭卷自测（点击展开前，先在心里/纸上说一遍）</h2>
+
+    <details>
+      <summary>Q1. 进程和程序的区别？<span class="badge A">A层</span></summary>
+      <div class="answer">
+        程序是躺在磁盘上的静态代码/数据；进程是程序被加载运行后的"活的状态"。一份程序（菜谱）可以同时对应多个进程（多个人同时按它做菜）。
+        <div class="pitfall">今天踩过的坑：一开始说反了方向——"进程是程序的一部分"。正确方向是"进程 ⊇ 程序在运行时的状态"，不是程序包含进程。</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Q2. 这一章的"关键问题"原句是什么？它和"隔离/互不影响"是同一件事吗？<span class="badge A">A层</span></summary>
+      <div class="answer">
+        原句："虽然只有少量的物理 CPU 可用，但是操作系统如何提供几乎有无数个 CPU 可用的假象？"——这问的是<b>数量幻觉</b>（能不能让少数CPU看起来像很多个），不是<b>隔离保护</b>（互不影响，是虚拟内存章节的主场）。
+        <div class="pitfall">今天踩过的坑：两次把"数量/并发"家族和"隔离/保护"家族搞混，是本次学习最大的元层级问题。</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Q3. 进程的机器状态由哪三部分组成？<span class="badge A">A层</span></summary>
+      <div class="answer">
+        ① 内存（地址空间） ② 寄存器（其中 PC / 栈指针 / 帧指针是寄存器的特殊子集，不是并列的第三类） ③ I/O 信息（打开的文件列表）。
+        <div class="pitfall">今天踩过的坑：把"寄存器"和它的子集"PC/SP/FP"并列成了平级的兄弟，还漏掉了 I/O 信息这一整块。</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Q4. 机制 vs 策略，为什么要故意分开设计？<span class="badge A">A层</span></summary>
+      <div class="answer">
+        这是模块化（modularity）的软件设计原则：机制负责"怎么做"（如上下文切换），永远不变；策略负责"选哪个"（如调度算法），可以随时替换，不用重新考虑机制。<br>
+        <b>验证过的两个类比：</b>①缓存淘汰——"怎么删数据"是机制，"选哪条删"（LRU/LFU）是策略。②反例：实时系统有时故意不分离，为了避免间接调用带来的不确定性，牺牲灵活性换取确定性（determinism）。
+      </div>
+    </details>
+
+    <details>
+      <summary>Q5. 默画进程三态转换图（这是今天默画通过的版本）<span class="badge A">A层</span></summary>
+      <div class="answer">
+        就绪 --调度(scheduled)--> 运行　|　运行 --取消调度(descheduled)--> 就绪　|　运行 --I/O:发起--> 阻塞　|　阻塞 --I/O:完成--> 就绪
+        <div class="pitfall">今天踩过的坑：一开始漏掉"运行→就绪"这条线（不知道纯 CPU 进程之间怎么轮换）；也把"阻塞→就绪"错写成"阻塞→运行"，忘了 I/O 完成后还要重新排队等调度。</div>
+      </div>
+    </details>
+  </section>
+
+  <!-- 3. 实践验证 -->
+  <section>
+    <h2><span class="num">3</span>实践验证：两种调度策略对比（纸笔推演）</h2>
+    <p class="dim">Process A：CPU、CPU、发起I/O(耗时2单位)、CPU，结束　|　Process B：CPU、CPU、CPU、CPU，结束</p>
+
+    <h3>情况① SWITCH_ON_IO + IO_RUN_IMMEDIATE（一阻塞就换人，I/O好了立刻抢回来）</h3>
+    <table>
+      <tr><th>时间</th><th>A</th><th>B</th><th>注</th></tr>
+      <tr><td>1</td><td class="run">运行</td><td class="ready">就绪</td><td class="note">A 第1步</td></tr>
+      <tr><td>2</td><td class="run">运行</td><td class="ready">就绪</td><td class="note">A 第2步，结束时发起 I/O</td></tr>
+      <tr><td>3</td><td class="block">阻塞</td><td class="run">运行</td><td class="note">立刻切到 B</td></tr>
+      <tr><td>4</td><td class="block">阻塞</td><td class="run">运行</td><td class="note">结束时 I/O 完成</td></tr>
+      <tr><td>5</td><td class="run">运行</td><td class="ready">就绪</td><td class="note">立刻抢回来，A 跑完最后一步并结束</td></tr>
+      <tr><td>6</td><td>—</td><td class="run">运行</td><td class="note">B 第3步</td></tr>
+      <tr><td>7</td><td>—</td><td class="run">运行</td><td class="note">B 第4步，结束</td></tr>
+    </table>
+    <p class="dim">总耗时 7 · CPU 利用率 7/7 = <b style="color:var(--accent-green)">100%</b>（A 等设备的两格，CPU 拿去跑了 B）</p>
+
+    <h3>情况② SWITCH_ON_END（死等 A 彻底结束才考虑切换）</h3>
+    <table>
+      <tr><th>时间</th><th>A</th><th>B</th><th>注</th></tr>
+      <tr><td>1</td><td class="run">运行</td><td class="ready">就绪</td><td class="note">A 第1步</td></tr>
+      <tr><td>2</td><td class="run">运行</td><td class="ready">就绪</td><td class="note">A 第2步，结束时发起 I/O</td></tr>
+      <tr><td>3</td><td class="block">阻塞</td><td class="ready">就绪</td><td class="note"><b style="color:var(--accent-red)">CPU 空闲</b>——不切到 B</td></tr>
+      <tr><td>4</td><td class="block">阻塞</td><td class="ready">就绪</td><td class="note"><b style="color:var(--accent-red)">CPU 空闲</b>，结束时 I/O 完成</td></tr>
+      <tr><td>5</td><td class="run">运行</td><td class="ready">就绪</td><td class="note">A 跑完最后一步并结束</td></tr>
+      <tr><td>6</td><td>—</td><td class="run">运行</td><td class="note">B 第1步</td></tr>
+      <tr><td>7</td><td>—</td><td class="run">运行</td><td class="note">B 第2步</td></tr>
+      <tr><td>8</td><td>—</td><td class="run">运行</td><td class="note">B 第3步</td></tr>
+      <tr><td>9</td><td>—</td><td class="run">运行</td><td class="note">B 第4步，结束</td></tr>
+    </table>
+    <p class="dim">总耗时 9 · CPU 利用率 7/9（第3、4格 CPU 白白空转）</p>
+
+    <h3>结论（综合追问的回答）</h3>
+    <p>情况①吞吐更高、CPU 不浪费，通常更优；但当"绝对不被打断"本身就是价值时——例如需要保证操作不可分割完成、避免不可预测的抢占时机（真实场景：某些实时系统追求确定性）——情况②的"死等到底"反而是合理选择。这印证了资料里那句悬念："这是不是一个好决定？由调度策略决定，答案不唯一。"</p>
+  </section>
+
+  <!-- 4. 盲点自查 -->
+  <section>
+    <h2><span class="num">4</span>盲点自查清单（今天真实踩过的坑，下次复习前先自己检查一遍）</h2>
+    <ul class="check">
+      <li class="hit">程序 vs 进程，方向别搞反——是"进程装着运行时状态"，不是"进程是程序的一部分"
+        <span class="fix">检查方法：能不能说出"一份程序可以同时对应几个进程"</span>
+      </li>
+      <li class="hit">"关键问题"问的是数量幻觉，不是隔离/互不影响——这是本次最大的元层级混淆点
+        <span class="fix">检查方法：被问"进程解决了什么问题"时，第一反应是不是又飘向了"安全/隔离"</span>
+      </li>
+      <li class="hit">机器状态三大块里，别把"寄存器"和它的子集"PC/SP/FP"并列成兄弟
+        <span class="fix">检查方法：能不能一次性说全三大块，且不重复不错位</span>
+      </li>
+      <li class="hit">阻塞态结束后，先回到"就绪"，不是直接"运行"——中间还要再被调度一次
+        <span class="fix">检查方法：默画三态图时，"阻塞→?"这条箭头终点是哪个框</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 5. 学习报告 -->
+  <section>
+    <h2><span class="num">5</span>本单元学习报告</h2>
+    <div class="report-grid">
+      <div class="report-card">
+        <div class="label">学习内容</div>
+        <div class="value">OSTEP 第4章 · 抽象：进程（4.1〜4.6全节）</div>
+      </div>
+      <div class="report-card">
+        <div class="label">掌握程度</div>
+        <div class="value">A层 5/5 已通过闭卷复述与默画验证；B层（进程创建流程、进程API五类接口、僵尸态）已理解思路，未深挖细节</div>
+      </div>
+      <div class="report-card">
+        <div class="label">需要加强</div>
+        <div class="value">"数量幻觉"与"隔离保护"两个家族的区分意识——今天在同一小时内出现两次同类型混淆</div>
+      </div>
+      <div class="report-card">
+        <div class="label">下一步行动</div>
+        <div class="value">D2 (09-25) 闭卷三题；进入第5章前，先用"上下兄弟问三句"预习新概念的家族归属</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. 复习计划 -->
+  <section>
+    <h2><span class="num">6</span>间隔复习计划</h2>
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-date">D2 · 09-25</div>
+        <div class="tl-body">3道闭卷题：① 默画三态图 ② 机制/策略各举一个新例子 ③ 复述"关键问题"原句</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">D7 · 09-30</div>
+        <div class="tl-body">5道题（含跨章节关联题，视第5章进度补充）：机器状态三大块 + SWITCH_ON_IO/END 场景应用</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">D30 · 10-23</div>
+        <div class="tl-body">综合题：用"进程抽象 + 机制策略分离"解释一个你实际遇到的多任务/调度现象</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>学习教练存档 · 依据：本页 learn/2026-09-23-进程抽象.html</footer>
+</div>
+</body>
+</html>
