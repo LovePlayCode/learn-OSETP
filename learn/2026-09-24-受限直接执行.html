@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026-09-24 · 第6章 机制：受限直接执行 · 学习报告</title>
+<style>
+  :root {
+    --bg-deep: #0b0d12;
+    --bg-panel: #14171d;
+    --metal-1: #1c2028;
+    --metal-2: #262b35;
+    --metal-edge: rgba(255,255,255,0.08);
+    --text-main: #e8e9ec;
+    --text-dim: #9aa0ac;
+    --accent-rose: #e8b4bc;
+    --accent-gold: #d4af37;
+    --accent-blue: #7fb8e0;
+    --accent-green: #8fd0a8;
+    --accent-red: #e08f8f;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(232,180,188,0.06), transparent 40%),
+      radial-gradient(circle at 80% 10%, rgba(127,184,224,0.05), transparent 45%),
+      linear-gradient(180deg, #0a0c10 0%, #0b0d12 100%);
+    color: var(--text-main);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    padding: 40px 20px 100px;
+  }
+
+  .wrap { max-width: 900px; margin: 0 auto; }
+
+  /* ---- Header ---- */
+  header {
+    background: linear-gradient(145deg, var(--metal-2), var(--metal-1));
+    border: 1px solid var(--metal-edge);
+    border-radius: var(--radius);
+    padding: 32px 36px;
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  header::before {
+    content: "";
+    position: absolute;
+    top: -60%; left: -20%;
+    width: 140%; height: 200%;
+    background: linear-gradient(120deg, transparent 40%, rgba(255,255,255,0.04) 50%, transparent 60%);
+    pointer-events: none;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--accent-gold);
+    border: 1px solid rgba(212,175,55,0.4);
+    border-radius: 20px;
+    padding: 4px 14px;
+    margin-bottom: 14px;
+    background: rgba(212,175,55,0.08);
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    letter-spacing: 1px;
+    color: var(--text-main);
+  }
+  .subtitle { color: var(--text-dim); font-size: 15px; }
+  .meta-row {
+    margin-top: 18px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .meta-row b { color: var(--accent-rose); }
+
+  /* ---- Section shell ---- */
+  section {
+    background: linear-gradient(160deg, rgba(38,43,53,0.6), rgba(20,23,29,0.6));
+    border: 1px solid var(--metal-edge);
+    border-radius: var(--radius);
+    padding: 26px 30px;
+    margin-bottom: 22px;
+    backdrop-filter: blur(6px);
+  }
+  h2 {
+    font-size: 19px;
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--accent-rose);
+  }
+  h2 .num {
+    background: linear-gradient(145deg, var(--metal-2), var(--metal-1));
+    border: 1px solid var(--metal-edge);
+    border-radius: 8px;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--accent-gold);
+    flex-shrink: 0;
+  }
+  h3 { color: var(--accent-blue); font-size: 15px; margin: 20px 0 10px; }
+  p { color: var(--text-main); }
+  .dim { color: var(--text-dim); font-size: 13.5px; }
+  code {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--metal-edge);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 12.5px;
+    color: var(--accent-green);
+  }
+
+  /* ---- Knowledge map ---- */
+  .map-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+  }
+  .map-box {
+    border: 1px solid var(--metal-edge);
+    background: var(--metal-1);
+    border-radius: 10px;
+    padding: 12px 18px;
+    text-align: center;
+    font-size: 14px;
+    width: 100%;
+  }
+  .map-box.key { border-color: rgba(212,175,55,0.5); color: var(--accent-gold); }
+  .map-box.core { border-color: rgba(232,180,188,0.5); color: var(--accent-rose); font-weight: bold; }
+  .map-arrow { color: var(--text-dim); font-size: 13px; }
+  .split-row { display: flex; gap: 12px; width: 100%; }
+  .split-row .map-box { flex: 1; }
+
+  /* ---- tree ---- */
+  pre.tree {
+    background: var(--metal-1);
+    border: 1px solid var(--metal-edge);
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text-main);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    margin: 0;
+  }
+
+  /* ---- Details ---- */
+  details {
+    border: 1px solid var(--metal-edge);
+    background: rgba(255,255,255,0.02);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+  }
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--accent-blue);
+    list-style: none;
+  }
+  summary::before { content: "▸ "; color: var(--accent-gold); }
+  details[open] summary::before { content: "▾ "; }
+  details .answer {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--metal-edge);
+    color: var(--text-main);
+    font-size: 14px;
+  }
+  details .answer .pitfall {
+    color: var(--accent-red);
+    font-size: 13px;
+    margin-top: 6px;
+  }
+
+  /* ---- table ---- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin: 10px 0 16px;
+  }
+  th, td {
+    border: 1px solid var(--metal-edge);
+    padding: 8px 10px;
+    text-align: center;
+  }
+  th { background: var(--metal-2); color: var(--accent-gold); }
+  td.run { color: var(--accent-green); }
+  td.block { color: var(--accent-red); }
+  td.ready { color: var(--text-dim); }
+  td.note { text-align: left; color: var(--text-dim); font-size: 12.5px; }
+  td.ok { color: var(--accent-green); }
+
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 12px;
+    margin-left: 8px;
+  }
+  .badge.A { background: rgba(212,175,55,0.15); color: var(--accent-gold); border: 1px solid rgba(212,175,55,0.4); }
+  .badge.B { background: rgba(127,184,224,0.15); color: var(--accent-blue); border: 1px solid rgba(127,184,224,0.4); }
+
+  ul.check { list-style: none; padding: 0; margin: 0; }
+  ul.check li {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--metal-edge);
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+  ul.check li .fix {
+    display: block;
+    color: var(--text-dim);
+    font-size: 12.5px;
+    margin-top: 4px;
+  }
+  ul.check li.hit { border-left: 3px solid var(--accent-red); }
+  ul.check li.win { border-left: 3px solid var(--accent-green); }
+
+  /* ---- report grid ---- */
+  .report-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .report-card {
+    background: var(--metal-1);
+    border: 1px solid var(--metal-edge);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .report-card .label { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 6px; }
+  .report-card .value { font-size: 14.5px; color: var(--text-main); }
+
+  /* ---- timeline ---- */
+  .timeline { display: flex; flex-direction: column; gap: 10px; }
+  .tl-item {
+    display: flex; gap: 14px; align-items: flex-start;
+    border-left: 2px solid rgba(212,175,55,0.4);
+    padding-left: 16px; position: relative;
+  }
+  .tl-item::before {
+    content: "";
+    position: absolute; left: -6px; top: 4px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent-gold);
+    box-shadow: 0 0 8px rgba(212,175,55,0.6);
+  }
+  .tl-date { color: var(--accent-gold); font-size: 13px; min-width: 90px; }
+  .tl-body { font-size: 13.5px; color: var(--text-main); }
+
+  .quote {
+    border-left: 3px solid rgba(212,175,55,0.5);
+    background: rgba(212,175,55,0.05);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    font-size: 14px;
+    margin: 14px 0;
+  }
+  .quote .from { display:block; color: var(--text-dim); font-size: 12.5px; margin-top: 6px; }
+
+  footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12.5px;
+    margin-top: 40px;
+  }
+
+  @media (max-width: 600px) {
+    .split-row { flex-direction: column; }
+    .report-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="tag">学习日期 · 2026-09-24</span>
+    <h1>第 6 章　机制：受限直接执行</h1>
+    <div class="subtitle">来源：《操作系统导论》（OSTEP） P37–46 · 6.1〜6.5 全节 · 学习目的：系统学习计算机基础</div>
+    <div class="meta-row">
+      <div>学习目标：<b>能完整默写「时钟中断 → 上下文切换 → return-from-trap」的时序，并说清"机制/策略"的分界线在哪</b></div>
+      <div>掌握层级：<span class="badge A">A层 5项通过</span><span class="badge B">B层 5项理解</span></div>
+      <div>本次最大突破：<b>从「只答一半」到「独立质疑教练」</b></div>
+    </div>
+  </header>
+
+  <!-- 1. 知识地图 -->
+  <section>
+    <h2><span class="num">1</span>知识地图</h2>
+
+    <div class="map-flow">
+      <div class="map-box key">关键问题：如何<u>高效</u>、<u>可控</u>地虚拟化 CPU？</div>
+      <div class="map-arrow">↓ 核心技术</div>
+      <div class="map-box core">受限直接执行　LDE = 直接执行（快） + 受限（稳）</div>
+      <div class="map-arrow">↓ 拆成两个关键问题</div>
+      <div class="split-row">
+        <div class="map-box">问题1：受限制的操作<br><span class="dim">怎么让进程做 I/O 而不失控</span></div>
+        <div class="map-box">问题2：进程之间切换<br><span class="dim">OS 怎么重获 CPU 控制权</span></div>
+      </div>
+    </div>
+
+    <h3>完整三层家族图</h3>
+    <pre class="tree">受限直接执行 LDE（总纲）
+│  目标：如何【高效】且【可控】地虚拟化 CPU   ← 两个词，缺一不可
+│
+├── 子问题一：受限制的操作
+│   │
+│   ├── 答案层：CPU 提供两种模式  ←「一个人戴两顶帽子」
+│   │   ├── 用户态 user mode      （同一块 CPU / 同一批寄存器，只差一个模式位）
+│   │   └── 内核态 kernel mode
+│   │
+│   └── 通道层：程序怎么安全地跨过这条界
+│       └── 系统调用（open/read…，为什么"看起来像过程调用"）
+│           └── 靠【陷阱 trap】指令实现          ← 这是"跳"这个动作
+│               └── 跳到哪，由【陷阱表 trap table】决定 ← 这是"地址簿"
+│                                            （启动时由内核设置，特权操作）
+│
+└── 子问题二：进程之间切换
+    │
+    ├── 前置难题：重获控制权（regain control）
+    │   ├── 协作方式 ── 等系统调用 / yield（把控制权"要"回来）
+    │   └── 非协作方式 ── 时钟中断（把控制权"抢"回来）★ 本章主角
+    │        └── 🔑 与左边对称：时钟中断处理程序的地址，
+    │              同样是启动时由内核登记进【陷阱表】的
+    │
+    └── 实现动作：上下文切换 context switch
+        └── 保存 A 的寄存器 → 切换内核栈 → 恢复 B 的寄存器
+            └── 背后是调度程序 scheduler 的"决定"  ← ⚠️ 这是策略，全章唯一一处
+</pre>
+
+    <div class="quote">
+      三句话记牢这一章：<br>
+      <b>可控 = 边界（两顶帽子） + 通道（系统调用） + 强制力（时钟中断）</b><br>
+      <b>高效 = 直接执行（不翻译、不搬家） + 模式切换成本≈0（只翻一个模式位）</b><br>
+      <b>"受限"之所以加得上去，恰恰是因为"直接"没有被破坏。</b>
+    </div>
+  </section>
+
+  <!-- 2. 闭卷自测 -->
+  <section>
+    <h2><span class="num">2</span>核心概念闭卷自测（点击展开前，先自己说一遍）</h2>
+
+    <details>
+      <summary>Q1. 本章的两个"关键问题"分别是什么？<span class="badge A">A层</span></summary>
+      <div class="answer">
+        <b>问题1（6.2）</b>：进程需要执行 I/O 和其他受限制的操作，但怎么才能不让它完全控制系统？<br>
+        <b>问题2（6.3）</b>：操作系统如何重获 CPU 的控制权（regain control），以便在进程之间切换？
+        <div class="pitfall">今天踩过的坑：问题1 一开始答成泛泛的"操作系统安全"——那是"感受"，不是"问题"。准确的说法是「<b>受限制的操作</b>」。问题2 完全想不起来，但它占了 6.3〜6.5 整整三节。</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Q2. 用户态 / 内核态，是"两个房间"还是"一个人戴两顶帽子"？<span class="badge A">A层</span></summary>
+      <div class="answer">
+        <b>是同一个人戴两顶帽子。</b>CPU 是同一块，寄存器是同一批，代码没有搬家——变的只是 CPU 内部的一个<b>模式位（mode bit）</b>。<br><br>
+        <b>为什么这个区别至关重要（今天第一次答漏的半句）：</b><br>
+        ① 切换模式不搬家、不重新加载，代价几乎为零 → <b>"直接执行"该有的「快」保住了</b>；<br>
+        ② 这个模式位只能由 trap / 中断 / return-from-trap 等硬件事件改写，用户代码没有任何办法自己翻 → <b>"受限"该有的「稳」也成立了</b>。<br><br>
+        <b>一句话：如果是"两个房间"，进程就能自己走过去，控制权就丢了。</b>
+        <div class="pitfall">今天踩过的坑：答对了"两顶帽子"，但漏掉了"为什么重要"这半句——这是同一形状错误的第 3 次出现。</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Q3. 为什么不能让进程自己设置陷阱表？<span class="badge A">A层</span></summary>
+      <div class="answer">
+        因为"设置陷阱表"本身就是一个<b>特权操作</b>——它就是被限制的东西之一。<br><br>
+        推演链：陷阱表规定"发生事件 X → CPU 跳到地址 Y"。若进程能改写它 → 把表项指向自己的代码 → 触发一次 trap → <b>CPU 切进内核态，却跳进了进程自己的代码</b> → 一段用户代码<b>戴着内核态的帽子在跑</b>。<br><br>
+        后果：可读写任意内存、关掉时钟中断、把陷阱表改成"永不切换"、永远霸占机器。<br><br>
+        <b>🔑 要焊死的一句：陷阱表之所以安全，不是因为内容写得好，而是因为"改它的资格"本身被硬件锁死了。</b>
+      </div>
+    </details>
+
+    <details>
+      <summary>Q4. 甲（执行除零指令）和乙（合法但永不调系统调用的死循环），OS 分别靠什么夺回 CPU？<span class="badge A">A层</span></summary>
+      <div class="answer">
+        <b>不是同一条路径。</b>
+        <table>
+          <tr><th></th><th>甲：除零指令</th><th>乙：健康但死循环</th></tr>
+          <tr><td>谁触发</td><td>进程自己（异常）</td><td class="block">没有任何人</td></tr>
+          <tr><td>靠什么机制</td><td>陷阱 trap</td><td class="run">时钟中断 timer interrupt ★</td></tr>
+          <tr><td>属于哪一类</td><td>协作方式</td><td class="run">非协作方式</td></tr>
+          <tr><td>OS 能做什么</td><td>拿到控制权，可能直接终止违规进程</td><td>拿到控制权，可切换到别的进程</td></tr>
+          <tr><td>删掉时钟中断后</td><td>仍能抓到</td><td class="block">系统彻底失控，只能 reboot</td></tr>
+        </table>
+        <b>最容易答错的陷阱：</b>甲看起来是"意外"，为什么归到「协作方式」？<br>
+        🔑 因为「协作 / 非协作」的划分标准<b>不是"进程乐不乐意"，而是"OS 拿到控制权是否需要依赖进程先做点什么"</b>：<br>
+        · 甲：进程触发了异常（哪怕不情愿），OS 才拿到控制权 → 依赖进程行为 → <b>协作</b><br>
+        · 乙：进程什么都没做，也永远不会做 → OS 完全无从下手 → 必须外部强制 → <b>非协作</b><br>
+        <b>所以乙才是这一章真正的主角。</b>没有时钟中断，昨天学的三态图里"运行→就绪"那条箭头根本不会发生。
+      </div>
+    </details>
+
+    <details>
+      <summary>Q5. 默写「时钟中断 → 上下文切换 → B 继续运行」的完整时序（本次 11 步全对）<span class="badge A">A层</span></summary>
+      <div class="answer">
+        <table>
+          <tr><th>#</th><th>发生了什么</th><th>谁做的</th></tr>
+          <tr><td>1</td><td>A 在用户态运行</td><td class="note">程序 A</td></tr>
+          <tr><td>2</td><td>时钟中断发生</td><td class="note">硬件</td></tr>
+          <tr><td>3</td><td>把 A 的用户态寄存器保存到 A 的内核栈</td><td class="note"><b>硬件自动（隐式）</b></td></tr>
+          <tr><td>4</td><td>转向内核模式，跳到陷阱处理程序</td><td class="note">硬件（地址来自陷阱表）</td></tr>
+          <tr><td>5</td><td>内核决定切换到 B</td><td class="note"><b>调度程序 scheduler ← 这是策略</b></td></tr>
+          <tr><td>6</td><td>把当前内核寄存器保存到 A 的进程结构</td><td class="note"><b>OS 显式（软件）</b></td></tr>
+          <tr><td>7</td><td>从 B 的进程结构恢复 B 的内核寄存器</td><td class="note">OS 显式</td></tr>
+          <tr><td>8</td><td>现在看起来就像 B 刚刚陷入内核</td><td class="note">——</td></tr>
+          <tr><td>9</td><td>执行 return-from-trap</td><td class="note">硬件</td></tr>
+          <tr><td>10</td><td>从 B 的内核栈恢复 B 的用户态寄存器</td><td class="note">硬件</td></tr>
+          <tr><td>11</td><td>B 继续运行</td><td class="note">程序 B</td></tr>
+        </table>
+        <div class="quote" style="margin:0">
+          💎 <b>本页最重要的一处洞察（自己答出来的）：</b><br>
+          寄存器保存发生了<b>两次，主体不同</b>——<br>
+          · 第 3 步：<b>硬件「自动」保存</b>用户寄存器（隐式）<br>
+          · 第 6 步：<b>OS「显式」保存</b>内核寄存器（软件）<br>
+          很多人读完只会说"寄存器被保存了"，感觉不到这层主体差别。能感到它，说明是真读进去了。
+        </div>
+        <div class="pitfall">小提醒：第 5 步的"决定"属于<b>策略</b>，第 6/7 步的"保存/恢复"属于<b>机制</b>。这一章全篇讲机制，唯一一处提到策略，就在这里。</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Q6. 为什么把"机制"和"策略"分到两章去讲？（本次由学习者独立提出质疑后深挖）<span class="badge A">A层</span></summary>
+      <div class="answer">
+        <b>书籍层面的答案（这才是问题本身）：</b><br>
+        ① <b>依赖顺序</b>：你没办法评价一个调度策略，除非先知道机制能提供什么。第 7 章所有算法都建立在"时钟中断一响随时能切"这个前提上——那是第 6 章给的。<br>
+        ② <b>全书节拍器</b>：这不是特例。后面内存虚拟化里，「分页（paging）= 机制」，「页面置换算法（LRU/Clock）= 策略」，同一个动作再来一遍。书在用同一套节拍反复训练同一个思维动作。<br>
+        ③ <b>分清「事实」与「选择」</b>：机制是已经定下来的地面（该记住），策略是仍有争议的设计空间（该有自己的观点）。混在一起讲，学生会把策略当定理背，或以为机制也能随便挑。<br>
+        <br>
+        <b>工程层面的答案（补充视角）：</b>机制几十年几乎不变，策略有几十种且不断出新。<b>用一个稳定的、被反复验证过的机制，去承载一个不断变化的策略——换策略时，机制一行都不用改。</b><br>
+        <br>
+        <b>🔬 最硬的证据（自己读过的那行代码）：</b><br>
+        <code>void switch(struct context *old, struct context *new);</code><br>
+        它只知道"存这个、恢复那个"，<b>完全不知道"为什么是这两个"</b>——"为什么"在调用它之前就被决定好了，是从外面传进来的两个指针。<b>机制和策略之间，只靠两个指针通信。</b><br>
+        <br>
+        <b>🔮 目录本身就是宣言：</b>这一章叫「<b>机制</b>：受限直接执行」，接下来连着三章叫「<b>调度</b>」。<br>
+        <br>
+        <div class="pitfall">本次踩坑：第一次答成循环论证——"因为是操作系统教程，需要分开讲"，等于没说。这是典型的"退步到抽象命题"现象。</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Q7. 纵向三问：为什么这样设计 / 不这样设计会怎样 / 有没有替代方案？<span class="badge A">A层</span></summary>
+      <div class="answer">
+        <b>纵向一 · 为什么需要两顶帽子？</b><br>
+        杀招是<b>递归</b>：你想拦一个坏操作——好，<b>谁来执行"拦"这个动作？</b>还是代码。代码跑在哪儿？还是跑在那块只有一种模式的 CPU 上。那么<b>拦人的代码，和要被拦的代码，权限一模一样</b>——于是"拦截"在物理上不成立了。<br>
+        🔑 <b>所以两顶帽子的本质，不是"给操作系统多点权力"，而是——让"更高"这个东西，第一次在物理上存在。</b>只有一顶帽子，保护不是"被绕过"，而是压根不存在。<br><br>
+
+        <b>纵向二 · 只有一种模式，攻击者能做什么？</b><br>
+        ① <b>改写陷阱表</b> → 让 trap 跳进自己的代码，穿着内核态跑；<br>
+        ② <b>关掉时钟中断</b> ★ ← 最致命。时钟中断是"非协作方式"的唯一武器，关掉它，OS <b>永远拿不回控制权</b>，进程独占整台机器；<br>
+        ③ 随意读写别的进程的内存、进程结构体。<br><br>
+
+        <b>纵向三 · 软件逐条检查行不行？（本章灵魂）</b><br>
+        画面：门卫扫一眼证件（便宜）× 门卫把每件行李逐件登记检查（贵十倍）——而人流是<b>每秒几十亿条指令</b>。<br>
+        若让 OS 逐条检查，程序就<b>不再是"直接跑"在 CPU 上，而是变成了被软件逐条解释执行</b>（相当于一个解释器），速度会<b>慢几个数量级</b>。<br>
+        🔑 <b>所以这一章只能叫"直接"执行——因为"直接"两个字本身就是性能的全部来源。而"受限"之所以能加得上去，恰恰是因为"直接"没有被破坏。</b>
+      </div>
+    </details>
+  </section>
+
+  <!-- 3. 连接构建 -->
+  <section>
+    <h2><span class="num">3</span>连接构建：第4章 ←→ 第6章</h2>
+    <p class="dim">昨天（09-23）学的「进程三态图」是抽象；今天学的机制是它的物理实体。</p>
+
+    <table>
+      <tr><th>第 4 章的抽象（昨天）</th><th>第 6 章的物理实现（今天）</th></tr>
+      <tr><td>运行 → 就绪（取消调度 descheduled）</td><td>时钟中断 + 上下文切换（11 步时序）</td></tr>
+      <tr><td>就绪 → 运行（调度 scheduled）</td><td>调度程序 scheduler 的决定 + return-from-trap 跳进 B</td></tr>
+      <tr><td>运行 → 阻塞（发起 I/O）</td><td>系统调用 → 陷阱 trap → 进入内核</td></tr>
+      <tr><td>进程的"机器状态"</td><td>上下文切换保存/恢复的那堆寄存器 + 内核栈</td></tr>
+    </table>
+
+    <div class="quote">
+      🎯 <b>一句话焊接：</b>昨天那个抽象的"取消调度"箭头，今天有了物理实体——<b>时钟中断动手、硬件隐式存用户寄存器、OS 显式存内核寄存器、切换到 B 的内核栈、return-from-trap 恢复 B</b>。<br>
+      <span class="dim">没有时钟中断，三态图里"运行→就绪"那条箭头根本不会发生。</span>
+    </div>
+  </section>
+
+  <!-- 4. 跨域验证 -->
+  <section>
+    <h2><span class="num">4</span>跨域迁移验证（用今天学到的判断标准，看新领域）</h2>
+    <p class="dim">老师留的小测：用「能不能做 vs 该选谁」这把尺子，量一量未来的内存虚拟化章节。</p>
+    <table>
+      <tr><th>概念</th><th>机制 / 策略</th><th>理由</th></tr>
+      <tr><td>分页 paging</td><td class="run">机制</td><td class="note">回答"<b>能不能</b>把地址空间切成页、映射到物理帧"</td></tr>
+      <tr><td>页面置换算法 LRU / Clock</td><td class="run">策略</td><td class="note">回答"内存满了<b>该选哪一页</b>踢出去"</td></tr>
+    </table>
+    <p class="dim">⚠️ 本题尚未作答，留待下次复习时自检。</p>
+  </section>
+
+  <!-- 5. 盲点自查 -->
+  <section>
+    <h2><span class="num">5</span>盲点自查清单（下次复习前，先自己检查一遍）</h2>
+    <ul class="check">
+      <li class="hit">① 二元概念"只抓一半"——本次共出现 3 次
+        <span class="fix">· 复述 LDE 时只答"受限（稳）"，漏掉"直接执行（快）"<br>
+        · 追问一答了"两顶帽子"，漏掉"为什么重要"<br>
+        · 纵向二要求"说两件"，只答了一件<br>
+        <b>自检动作：每答完一句，问自己"这句话里有没有'和/与/以及'？我是不是又答了一半？"</b></span>
+      </li>
+      <li class="hit">② 把"问题的前提"当成"问题的答案"
+        <span class="fix">被问"高效是什么意思"时答成"一个 CPU"——而"CPU 很少"是<b>背景条件</b>，不是答案。<br>
+        <b>自检方法：分清"这句话是在铺垫，还是在下结论"。出现得越频繁的句子，越可能只是铺垫。</b></span>
+      </li>
+      <li class="hit">③ 抽象命题题容易掉线（但已找到解法）
+        <span class="fix">凡"为什么这样设计""为什么分两章"这类问题连续说"想不到了"。<br>
+        <b>解法：把抽象问题翻译成一件实物</b>——门卫查证件、switch 函数签名、角色代入（你是硬件工程师/攻击者）。</span>
+      </li>
+      <li class="hit">④ 层级图上曾经出现的两处错位（已修正）
+        <span class="fix">· "用户态/内核态" 不能和 "系统调用" 并列成兄弟（一个是舞台，一个是桥上通道）<br>
+        · "上下文切换" 不是总纲的第三个儿子，它是「子问题二」的实现动作</span>
+      </li>
+      <li class="win">✅ 已焊死（不用再担心的）
+        <span class="fix">· 上下文切换 11 步时序 —— 零误差<br>
+        · "硬件隐式保存用户寄存器" vs "OS 显式保存内核寄存器" —— 能自己区分出来<br>
+        · 可控 = 边界 + 通道 + 强制力 —— 三样齐全<br>
+        · "受限"限制的是身份（谁有资格），不是指令白名单</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 6. 学习报告 -->
+  <section>
+    <h2><span class="num">6</span>本单元学习报告</h2>
+    <div class="report-grid">
+      <div class="report-card">
+        <div class="label">学习内容</div>
+        <div class="value">OSTEP 第 6 章 · 机制：受限直接执行（6.1〜6.5 全节 + 参考资料）</div>
+      </div>
+      <div class="report-card">
+        <div class="label">掌握程度</div>
+        <div class="value">A层 7/7 通过闭卷复述与默写验证；B层（三个协议表、xv6汇编思路、禁用中断、restart、μs级性能）已理解思路；C层（汇编指令名、参考文献）跳过</div>
+      </div>
+      <div class="report-card">
+        <div class="label">本次最大突破</div>
+        <div class="value"><b>独立质疑教练成功。</b>精准指出"你答的是『设计者为什么分离』，不是『书为什么分两章』"——命中了"答非所问"这一元层级问题，而这个问题恰好是学习者本人当天踩过的坑。<b>这说明分层意识已经从"能听懂"进化到"能主动识别"。</b></div>
+      </div>
+      <div class="report-card">
+        <div class="label">需要加强</div>
+        <div class="value">① 二元概念的第二半（今日 3 次，与 09-23 同源）② 抽象命题题的"具象翻译"能力（已有可用方法）</div>
+      </div>
+      <div class="report-card">
+        <div class="label">下一步行动</div>
+        <div class="value">D2（09-26）闭卷三题；进第 7 章「调度：介绍」前，先用「机制/策略」这把尺子预判每节属于哪一半</div>
+      </div>
+      <div class="report-card">
+        <div class="label">待办小测</div>
+        <div class="value">「跨域迁移验证」中的分页 vs 页面置换算法，尚未作答</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. 复习计划 -->
+  <section>
+    <h2><span class="num">7</span>间隔复习计划</h2>
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-date">D2 · 09-26</div>
+        <div class="tl-body">3道闭卷题：① 默写上下文切换 11 步时序 ② 甲（除零）和乙（死循环）分别靠什么机制夺回 CPU ③ 说全「可控 = 边界 + 通道 + 强制力」</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">D7 · 10-01</div>
+        <div class="tl-body">5道题（含跨章关联）：机制/策略分界线 + 陷阱表为什么不能由用户设置 + 连接第 4 章三态图 + 「跨域迁移验证」的分页 vs 页面置换 + 第 7 章预习关联</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">D30 · 10-24</div>
+        <div class="tl-body">综合题：用「受限直接执行 + 机制/策略分离」解释一个你实际遇到的操作系统现象（如卡顿、假死、进程杀不掉）</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">待定 · 09-25</div>
+        <div class="tl-body">📌 <b>第 4 章「进程抽象」的 D2 复习</b>（3道闭卷题：默画三态图 / 机制策略各举新例 / 复述关键问题原句）</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>学习教练存档 · 依据：本页 learn/2026-09-24-受限直接执行.html · 上一单元：learn/2026-09-23-进程抽象.html</footer>
+</div>
+</body>
+</html>
