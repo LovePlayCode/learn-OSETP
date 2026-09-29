@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026-09-28 · 复习：进程抽象 + 受限直接执行 · 复习报告</title>
+<style>
+  :root {
+    --bg-deep: #0b0d12;
+    --bg-panel: #14171d;
+    --metal-1: #1c2028;
+    --metal-2: #262b35;
+    --metal-edge: rgba(255,255,255,0.08);
+    --text-main: #e8e9ec;
+    --text-dim: #9aa0ac;
+    --accent-rose: #e8b4bc;
+    --accent-gold: #d4af37;
+    --accent-blue: #7fb8e0;
+    --accent-green: #8fd0a8;
+    --accent-red: #e08f8f;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(232,180,188,0.06), transparent 40%),
+      radial-gradient(circle at 80% 10%, rgba(127,184,224,0.05), transparent 45%),
+      linear-gradient(180deg, #0a0c10 0%, #0b0d12 100%);
+    color: var(--text-main);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    padding: 40px 20px 100px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  header {
+    background: linear-gradient(145deg, var(--metal-2), var(--metal-1));
+    border: 1px solid var(--metal-edge);
+    border-radius: var(--radius);
+    padding: 32px 36px;
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  header::before {
+    content: "";
+    position: absolute; top: -60%; left: -20%;
+    width: 140%; height: 200%;
+    background: linear-gradient(120deg, transparent 40%, rgba(255,255,255,0.04) 50%, transparent 60%);
+    pointer-events: none;
+  }
+  .tag {
+    display: inline-block; font-size: 12px; letter-spacing: 2px;
+    color: var(--accent-gold);
+    border: 1px solid rgba(212,175,55,0.4);
+    border-radius: 20px; padding: 4px 14px; margin-bottom: 14px;
+    background: rgba(212,175,55,0.08);
+  }
+  h1 { margin: 0 0 8px; font-size: 26px; letter-spacing: 1px; color: var(--text-main); }
+  .subtitle { color: var(--text-dim); font-size: 15px; }
+  .meta-row {
+    margin-top: 18px; display: flex; gap: 24px; flex-wrap: wrap;
+    font-size: 13px; color: var(--text-dim);
+  }
+  .meta-row b { color: var(--accent-rose); }
+  section {
+    background: linear-gradient(160deg, rgba(38,43,53,0.6), rgba(20,23,29,0.6));
+    border: 1px solid var(--metal-edge);
+    border-radius: var(--radius);
+    padding: 26px 30px; margin-bottom: 22px;
+    backdrop-filter: blur(6px);
+  }
+  h2 {
+    font-size: 19px; margin: 0 0 18px; display: flex; align-items: center; gap: 10px;
+    color: var(--accent-rose);
+  }
+  h2 .num {
+    background: linear-gradient(145deg, var(--metal-2), var(--metal-1));
+    border: 1px solid var(--metal-edge); border-radius: 8px;
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--accent-gold); flex-shrink: 0;
+  }
+  h3 { color: var(--accent-blue); font-size: 15px; margin: 20px 0 10px; }
+  p { color: var(--text-main); }
+  .dim { color: var(--text-dim); font-size: 13.5px; }
+  pre.tree {
+    background: var(--metal-1); border: 1px solid var(--metal-edge); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.65;
+    color: var(--text-main); font-family: "SF Mono", Menlo, Consolas, monospace; margin: 0;
+  }
+  details {
+    border: 1px solid var(--metal-edge); background: rgba(255,255,255,0.02);
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 12px;
+  }
+  summary { cursor: pointer; font-weight: 600; color: var(--accent-blue); list-style: none; }
+  summary::before { content: "▸ "; color: var(--accent-gold); }
+  details[open] summary::before { content: "▾ "; }
+  details .answer {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--metal-edge);
+    color: var(--text-main); font-size: 14px;
+  }
+  details .answer .pitfall { color: var(--accent-red); font-size: 13px; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 10px 0 16px; }
+  th, td { border: 1px solid var(--metal-edge); padding: 8px 10px; text-align: center; }
+  th { background: var(--metal-2); color: var(--accent-gold); }
+  td.note { text-align: left; color: var(--text-dim); font-size: 12.5px; }
+  .badge {
+    display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 12px; margin-left: 8px;
+  }
+  .badge.A { background: rgba(212,175,55,0.15); color: var(--accent-gold); border: 1px solid rgba(212,175,55,0.4); }
+  .badge.new { background: rgba(127,184,224,0.15); color: var(--accent-blue); border: 1px solid rgba(127,184,224,0.4); }
+  ul.check { list-style: none; padding: 0; margin: 0; }
+  ul.check li {
+    padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.02);
+    border: 1px solid var(--metal-edge); margin-bottom: 8px; font-size: 14px;
+  }
+  ul.check li .fix { display: block; color: var(--text-dim); font-size: 12.5px; margin-top: 4px; }
+  ul.check li.hit { border-left: 3px solid var(--accent-red); }
+  ul.check li.win { border-left: 3px solid var(--accent-green); }
+  .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .report-card {
+    background: var(--metal-1); border: 1px solid var(--metal-edge); border-radius: 10px; padding: 16px 18px;
+  }
+  .report-card .label { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 6px; }
+  .report-card .value { font-size: 14.5px; color: var(--text-main); }
+  .timeline { display: flex; flex-direction: column; gap: 10px; }
+  .tl-item {
+    display: flex; gap: 14px; align-items: flex-start;
+    border-left: 2px solid rgba(212,175,55,0.4); padding-left: 16px; position: relative;
+  }
+  .tl-item::before {
+    content: ""; position: absolute; left: -6px; top: 4px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent-gold); box-shadow: 0 0 8px rgba(212,175,55,0.6);
+  }
+  .tl-date { color: var(--accent-gold); font-size: 13px; min-width: 90px; }
+  .tl-body { font-size: 13.5px; color: var(--text-main); }
+  .quote {
+    border-left: 3px solid rgba(212,175,55,0.5); background: rgba(212,175,55,0.05);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; font-size: 14px; margin: 14px 0;
+  }
+  footer { text-align: center; color: var(--text-dim); font-size: 12.5px; margin-top: 40px; }
+  @media (max-width: 600px) { .report-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="tag">复习日期 · 2026-09-28</span>
+    <h1>补档式综合复习：进程三态 × 受限直接执行</h1>
+    <div class="subtitle">来源单元：learn/2026-09-23-进程抽象.html · learn/2026-09-24-受限直接执行.html</div>
+    <div class="meta-row">
+      <div>复习类型：<b>补档综合复习（原D2已过期，D7未到，先做一次衔接）</b></div>
+      <div>方式：闭卷问答 + 追问纠错</div>
+      <div>完成度：<span class="badge A">A层 2项焊死</span><span class="badge new">新增坑 1项</span></div>
+    </div>
+  </header>
+
+  <!-- 1. 知识地图回顾 -->
+  <section>
+    <h2><span class="num">1</span>本次复习覆盖的知识地图</h2>
+    <pre class="tree">进程三态转换（第4章）
+├── 就绪 → 运行   触发：调度器的决定（搭便车在别的中断处理流程中完成，不是独立硬件中断）
+├── 运行 → 就绪   触发：时钟中断（外部时钟硬件周期性强制打断）
+├── 运行 → 阻塞   触发：陷阱 trap（进程自己发起系统调用，主动交权）
+└── 阻塞 → 就绪   触发：设备中断（磁盘/网卡等外部设备完成任务后主动敲门）★本次新焊死
+
+陷阱 vs 中断（第6章，"上下兄弟"关系）
+        理念层：都是让 CPU 从当前代码跳进内核的机制
+                        │
+        ┌───────────────┴───────────────┐
+   兄弟①：陷阱/异常                 兄弟②：中断
+  （进程自己触发，同步的）        （外部硬件触发，异步的）
+        │                              │
+   例：系统调用、除零              例：时钟中断、设备中断
+
+机制 / 策略跨领域迁移（第6章核心思想的验证）
+  OS 内：机制=上下文切换/时钟中断；策略=调度算法
+  缓存内：机制=链表节点增删；策略=LRU（选谁淘汰）
+  打车软件：机制=派单执行流程（发单→接单→导航）；策略=派单规则（最近优先/评分优先）</pre>
+  </section>
+
+  <!-- 2. 闭卷复习过程 -->
+  <section>
+    <h2><span class="num">2</span>闭卷复习实录</h2>
+
+    <details open>
+      <summary>Q1. 默画三态图，并标出每条箭头背后的触发机制<span class="badge A">A层</span></summary>
+      <div class="answer">
+        <b>第一轮</b>：四条箭头方向全对（09-23的老坑"阻塞→运行"写反，这次已完全修正），但完全没标机制。<br>
+        <b>第二轮</b>：补充机制标注，但"就绪→运行"和"运行→就绪"标注成了完全相同的"时钟中断+上下文切换"——没有区分"被迫下台"和"被选中上台"的不同触发源。<br>
+        <b>第三轮</b>：进一步补充，但把"设备中断"错认成了"陷阱回调"。<br>
+        <b>最终修正版（本次真正焊死）：</b>
+        <table>
+          <tr><th>转换</th><th>触发事件</th></tr>
+          <tr><td>就绪 → 运行</td><td>调度器的决定（搭便车在中断处理流程中完成，不是独立硬件中断）</td></tr>
+          <tr><td>运行 → 就绪</td><td>时钟中断</td></tr>
+          <tr><td>运行 → 阻塞</td><td>陷阱（系统调用）</td></tr>
+          <tr><td>阻塞 → 就绪</td><td>设备中断</td></tr>
+        </table>
+        <div class="pitfall">本次新坑：把"设备中断"叫成"陷阱回调"——这是"陷阱/中断"这对兄弟第一次被记录混淆，此前三份存档均未出现过。</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Q2. 陷阱 vs 中断，如何区分？<span class="badge new">新增</span></summary>
+      <div class="answer">
+        经过纠错后，学习者自己推导出正确区分：<br>
+        · <b>陷阱/异常</b>：进程自己主动或不小心触发（系统调用、除零），同步事件。<br>
+        · <b>中断</b>：外部硬件主动触发（时钟、设备完成I/O），异步事件，跟进程当前在做什么无关。<br>
+        并且能自己说出"设备中断"这个具体名词——虽然没有直接背过，但通过"时钟中断是周期性无差别触发"这一特性做了合理类比推导。
+        <div class="pitfall">提醒：曾一度联想到"轮询（polling）"，但该词不在已学笔记范围内，属于课外合理推测，不计入正式知识点，已当场澄清边界。</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Q3. 举一个操作系统之外的机制/策略例子<span class="badge A">A层</span></summary>
+      <div class="answer">
+        <b>第一轮</b>：给出"时钟中断=机制，进程调度=策略"——被指出这只是笔记原句的同义替换，不算新例子。<br>
+        <b>第二轮</b>：给出"LRU：删除节点是机制，怎么删除是策略"——概念方向反了，两句话其实说的是同一层。经引导修正为"LRU算法本身是策略，链表节点增删操作才是机制"——但LRU仍属于"资源淘汰选择题"家族，跟OS调度、页面置换是近亲，不算真正的新领域。<br>
+        <b>第三轮（通过）</b>：打车软件——"把订单发给某位具体司机的执行流程"是机制，"该派给哪个司机"的决策规则是策略。<b>这是第一次成功地把"机制/策略"框架完全脱离计算机领域、独立复述。</b>
+      </div>
+    </details>
+  </section>
+
+  <!-- 3. 盲点自查 -->
+  <section>
+    <h2><span class="num">3</span>盲点自查清单</h2>
+    <ul class="check">
+      <li class="win">✅ 三态图方向已完全焊死——09-23的"阻塞→运行"错误未再复发
+        <span class="fix">检查方法：能不能不假思索地画出四个箭头且方向不错</span>
+      </li>
+      <li class="win">✅ 机制/策略跨领域迁移能力已建立——能脱离OS外壳，套用到打车软件等生活场景
+        <span class="fix">检查方法：给一个新场景（如做饭/挑衣服），能否在10秒内说出哪部分是机制、哪部分是策略</span>
+      </li>
+      <li class="hit">⚠️ 新坑：陷阱 vs 中断混淆——把"设备中断"错认成"陷阱回调"
+        <span class="fix">检查方法：被问"阻塞→就绪由谁触发"时，第一反应是不是又想成了"陷阱"；记住陷阱=进程自己捅出来的，中断=外部硬件敲门的</span>
+      </li>
+      <li class="hit">⚠️ 举新例子时，容易在"同一家族内部打转"（LRU/页面置换/进程调度本质是同一类"选择题"）
+        <span class="fix">检查方法：被要求举"新例子"时，先问自己"这个例子和上一个例子，是不是同一个更大类别里的兄弟？"</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- 4. 学习报告 -->
+  <section>
+    <h2><span class="num">4</span>本单元复习报告</h2>
+    <div class="report-grid">
+      <div class="report-card">
+        <div class="label">复习内容</div>
+        <div class="value">第4章进程三态图 + 触发机制、第6章陷阱/中断区分、机制策略跨领域迁移</div>
+      </div>
+      <div class="report-card">
+        <div class="label">掌握程度</div>
+        <div class="value">三态图方向：A层已焊死；触发机制标注：A层新焊死（含"就绪→运行"与"运行→就绪"的区分、"阻塞→就绪"的设备中断）；机制/策略迁移：A层，完成跨领域独立复述的跃迁</div>
+      </div>
+      <div class="report-card">
+        <div class="label">需要加强</div>
+        <div class="value">陷阱 vs 中断的边界（新坑，需专项复查）；举例时容易困在同一知识家族内打转</div>
+      </div>
+      <div class="report-card">
+        <div class="label">下一步行动</div>
+        <div class="value">补第7章（调度指标+四算法演进链）复习；D7综合复习（原定09-30/10-01）建议把陷阱/中断专项抽查加入题目</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. 复习计划 -->
+  <section>
+    <h2><span class="num">5</span>后续复习计划</h2>
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-date">待办 · 近期</div>
+        <div class="tl-body">补第7章「进程调度：介绍」的间隔复习（调度指标定义+对立根因、四算法演进链、护航效应完整定义）</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">D7 · 09-30 / 10-01</div>
+        <div class="tl-body">5道题（跨章节）：三态图+机制默写 · 陷阱/中断专项辨析 · 机制策略举第三个新例子 · 调度算法演进链 · 分页vs页面置换待办小测</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">D30 · 10-23/24</div>
+        <div class="tl-body">综合题：用进程抽象+机制策略分离+调度指标，解释一个实际遇到的系统现象</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="quote">
+    🎯 本次复习最大收获：机制/策略这对概念，第一次被证明能<b>脱离操作系统外壳独立存在</b>——这标志着它已经从"学科知识"内化成了"思维工具"。
+  </div>
+
+  <footer>学习教练存档 · 依据：learn/2026-09-23-进程抽象.html · learn/2026-09-24-受限直接执行.html</footer>
+</div>
+</body>
+</html>

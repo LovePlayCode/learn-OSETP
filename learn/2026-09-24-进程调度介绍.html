@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026-09-24 · 第7章 进程调度：介绍 · 学习报告</title>
+<style>
+  :root {
+    --bg-deep: #0b0d12;
+    --bg-panel: #14171d;
+    --metal-1: #1c2028;
+    --metal-2: #262b35;
+    --metal-edge: rgba(255,255,255,0.08);
+    --text-main: #e8e9ec;
+    --text-dim: #9aa0ac;
+    --accent-rose: #e8b4bc;
+    --accent-gold: #d4af37;
+    --accent-blue: #7fb8e0;
+    --accent-green: #8fd0a8;
+    --accent-red: #e08f8f;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background:
+      radial-gradient(circle at 20% 0%, rgba(232,180,188,0.06), transparent 40%),
+      radial-gradient(circle at 80% 10%, rgba(127,184,224,0.05), transparent 45%),
+      linear-gradient(180deg, #0a0c10 0%, #0b0d12 100%);
+    color: var(--text-main);
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    padding: 40px 20px 100px;
+  }
+
+  .wrap { max-width: 900px; margin: 0 auto; }
+
+  /* ---- Header ---- */
+  header {
+    background: linear-gradient(145deg, var(--metal-2), var(--metal-1));
+    border: 1px solid var(--metal-edge);
+    border-radius: var(--radius);
+    padding: 32px 36px;
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  header::before {
+    content: "";
+    position: absolute;
+    top: -60%; left: -20%;
+    width: 140%; height: 200%;
+    background: linear-gradient(120deg, transparent 40%, rgba(255,255,255,0.04) 50%, transparent 60%);
+    pointer-events: none;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--accent-gold);
+    border: 1px solid rgba(212,175,55,0.4);
+    border-radius: 20px;
+    padding: 4px 14px;
+    margin-bottom: 14px;
+    background: rgba(212,175,55,0.08);
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    letter-spacing: 1px;
+    color: var(--text-main);
+  }
+  .subtitle { color: var(--text-dim); font-size: 15px; }
+  .meta-row {
+    margin-top: 18px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .meta-row b { color: var(--accent-rose); }
+
+  /* ---- Section shell ---- */
+  section {
+    background: linear-gradient(160deg, rgba(38,43,53,0.6), rgba(20,23,29,0.6));
+    border: 1px solid var(--metal-edge);
+    border-radius: var(--radius);
+    padding: 26px 30px;
+    margin-bottom: 22px;
+    backdrop-filter: blur(6px);
+  }
+  h2 {
+    font-size: 19px;
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--accent-rose);
+  }
+  h2 .num {
+    background: linear-gradient(145deg, var(--metal-2), var(--metal-1));
+    border: 1px solid var(--metal-edge);
+    border-radius: 8px;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--accent-gold);
+    flex-shrink: 0;
+  }
+  h3 { color: var(--accent-blue); font-size: 15px; margin: 20px 0 10px; }
+  p { color: var(--text-main); }
+  .dim { color: var(--text-dim); font-size: 13.5px; }
+  code {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--metal-edge);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 13px;
+    color: var(--accent-gold);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  pre {
+    background: rgba(10,12,16,0.75);
+    border: 1px solid var(--metal-edge);
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--accent-blue);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  /* ---- Stats ---- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
+    margin: 18px 0 6px;
+  }
+  .stat {
+    background: linear-gradient(145deg, var(--metal-2), var(--metal-1));
+    border: 1px solid var(--metal-edge);
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .stat b {
+    display: block;
+    font-size: 24px;
+    color: var(--accent-gold);
+    margin-bottom: 4px;
+  }
+  .stat span { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; }
+
+  /* ---- Tables ---- */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 13.5px;
+  }
+  th {
+    text-align: left;
+    color: var(--accent-gold);
+    font-weight: 600;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--metal-edge);
+    background: rgba(212,175,55,0.05);
+    font-size: 12.5px;
+    letter-spacing: 1px;
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    color: var(--text-main);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+
+  /* ---- Callouts ---- */
+  .callout {
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 14px 0;
+    font-size: 13.5px;
+    border: 1px solid;
+  }
+  .callout.gold   { border-color: rgba(212,175,55,0.35);  background: rgba(212,175,55,0.07);  color: var(--accent-gold); }
+  .callout.green  { border-color: rgba(143,208,168,0.35); background: rgba(143,208,168,0.07); color: var(--accent-green); }
+  .callout.red    { border-color: rgba(224,143,143,0.35); background: rgba(224,143,143,0.07); color: var(--accent-red); }
+  .callout.blue   { border-color: rgba(127,184,224,0.35); background: rgba(127,184,224,0.07); color: var(--accent-blue); }
+  .callout b { display: block; margin-bottom: 4px; }
+
+  /* ---- Blindspot / highlight cards ---- */
+  .card-list { display: grid; gap: 12px; }
+  .card {
+    background: linear-gradient(145deg, var(--metal-2), var(--metal-1));
+    border: 1px solid var(--metal-edge);
+    border-radius: 12px;
+    padding: 16px 20px;
+  }
+  .card h4 {
+    margin: 0 0 6px;
+    font-size: 14px;
+    color: var(--accent-rose);
+  }
+  .card p { margin: 0; font-size: 13.5px; color: var(--text-dim); }
+  .card p b { color: var(--text-main); }
+
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    border-radius: 12px;
+    padding: 2px 10px;
+    margin-left: 8px;
+    vertical-align: 2px;
+    letter-spacing: 1px;
+  }
+  .badge.fix  { color: var(--accent-green); border: 1px solid rgba(143,208,168,0.4); background: rgba(143,208,168,0.08); }
+  .badge.warn { color: var(--accent-red);   border: 1px solid rgba(224,143,143,0.4); background: rgba(224,143,143,0.08); }
+  .badge.gold { color: var(--accent-gold);  border: 1px solid rgba(212,175,55,0.4);  background: rgba(212,175,55,0.08); }
+
+  footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 40px;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ================= HEADER ================= -->
+<header>
+  <span class="tag">OSTEP · 第 7 章 · 学习报告</span>
+  <h1>进程调度：介绍</h1>
+  <p class="subtitle">机制 → 策略的跃迁 · 一条"放宽假设 → 旧算法暴毙 → 新算法登场"的演进链</p>
+  <div class="meta-row">
+    <span>📅 学习日期：<b>2026-09-24</b></span>
+    <span>📖 资料：OSTEP 第 7 章（07.pdf）</span>
+    <span>🔗 前置章节：<b>第 4 章 进程抽象 · 第 6 章 受限直接执行</b></span>
+    <span>⏱️ 模式：关门复述 + 追问批改 + 连接构建</span>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>4</b><span>核心算法吃透</span></div>
+    <div class="stat"><b>2</b><span>调度指标焊死</span></div>
+    <div class="stat"><b>3</b><span>手算验证全对</span></div>
+    <div class="stat"><b>4</b><span>元层级复发→修复</span></div>
+    <div class="stat"><b>5</b><span>追问/补题通过</span></div>
+  </div>
+</header>
+
+<!-- ================= 01 位置与主线 ================= -->
+<section>
+  <h2><span class="num">01</span>本章在 OS 版图中的位置</h2>
+  <pre>第 4 章 进程抽象      → "进程是什么"          （抽象）
+第 6 章 受限直接执行   → "怎么让进程安全地跑起来"（机制：陷入内核 · 上下文切换 · 时钟中断）
+第 7 章 进程调度：介绍 → "CPU 只有一个，一堆进程抢，谁先跑？"（策略！★本章）</pre>
+  <p>前面两章都是<b>机制（mechanism）</b>，本章第一次上升到<b>策略（policy / discipline）</b>——
+  上章学的是"怎么切"，本章回答"切给谁"。其中一个算法（STCF）正是靠上章的"时钟中断 + 上下文切换"才能存在。</p>
+  <div class="callout gold"><b>🔑 核心问题（书 7.0 开篇）</b>
+  如何开发一个考虑调度策略的基本框架？什么是关键假设？哪些指标非常重要？哪些基本方法已经在早期的系统中使用？</div>
+</section>
+
+<!-- ================= 02 知识地图 ================= -->
+<section>
+  <h2><span class="num">02</span>知识地图 · 演进链全景</h2>
+  <pre>                调度策略 (Policy)
+                      │
+        ┌─── 怎么衡量"好"？ ───┐
+     周转时间 ←──天生对立──→ 响应时间
+   (跑得快=性能)          (等得短=公平/交互)
+                      │
+  ─────────── 假设逐条放宽，算法逐个登场 ───────────
+                      │
+  假设1+2: 同长·同到 ──→ FIFO ─── 护航效应(大车堵门,小车干瞪眼)
+  放宽1: 长度不同 ────→ SJF ──── 同时到达时最优,但非抢占
+  放宽2: 随时到达 ────→ STCF ─── SJF+抢占 ←★用的是第6章的时钟中断!
+  新指标登场 ────────→ RR ────── 时间片轮转,响应最好,周转最差
+  放宽4: 有 I/O ─────→ 重叠 ──── 把每个CPU突发当独立小任务
+  放宽5: 长度未知 ────→ ??? ──── 第8章 MLFQ 伏笔</pre>
+  <p class="dim">骨架 = "放宽一条假设 → 冒出一个新算法 → 又暴露一个新问题"。五个算法不是孤立名词，是一条因果链。</p>
+
+  <h3>分层结构（上下兄弟）</h3>
+  <pre>      理念层：调度好不好，先问"用什么尺子量"
+                      │
+      ┌───────────────┴───────────────┐
+  兄弟A：周转时间                  兄弟B：响应时间
+ （从进系统到干完）              （从进系统到第一次被搭理）
+      │                              │
+ 押注算法营：SJF / STCF          押注算法营：RR
+ （性能营，牺牲公平）            （公平营，牺牲性能）
+                      │
+      底层工具：抢占 = 时钟中断 + 上下文切换（第 6 章）</pre>
+
+  <h3>抢占的双机制分层（本章最关键的一格）</h3>
+  <pre>        理念层：抢占（把 CPU 从 A 手里拿走，交给 B）
+                        │
+        ┌───────────────┴───────────────┐
+    兄弟①：时钟中断                兄弟②：上下文切换
+   （让 OS 重新获得控制权）        （真正完成"拿走→保存→恢复"的动作）
+                        │
+        底层依赖：双模式操作（第 6 章）</pre>
+  <div class="callout blue"><b>💡 一句话锚定</b>
+  时钟中断只是"敲门"，上下文切换才是"换人"。门敲开了没人上场，比赛照样停摆。</div>
+</section>
+
+<!-- ================= 03 A层核心 ================= -->
+<section>
+  <h2><span class="num">03</span>A 层核心 · 必须脱口复述</h2>
+
+  <h3>① 两大调度指标（尺子）</h3>
+  <table>
+    <thead><tr><th>指标</th><th>定义</th><th>押注的算法</th><th>天生对立的根源</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>周转时间</b><br><span class="dim">turnaround time</span></td>
+        <td>T<sub>周转</sub> = T<sub>完成</sub> − T<sub>到达</sub><br><span class="dim">性能（performance）指标，本章首要关注点</span></td>
+        <td>SJF / STCF</td>
+        <td rowspan="2">CPU 时间是<b>零和</b>的：给了 A 就给不了 B。周转要"短任务先跑完"，响应要"人人快点摸到 CPU"——对同一个 CPU 时间提出了<b>相反的分配要求</b>。</td>
+      </tr>
+      <tr>
+        <td><b>响应时间</b><br><span class="dim">response time</span></td>
+        <td>T<sub>响应</sub> = T<sub>首次运行</sub> − T<sub>到达</sub><br><span class="dim">分时系统诞生后的新指标，交互性需求</span></td>
+        <td>RR</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="callout green"><b>✅ 学习者修正轨迹</b>
+  第一轮只交出"尺子的两端"这类现象描述 → 第二轮用"RR 拖长完成时间 / SJF 拖长首次运行"双场景自己演出了矛盾 → 收口于"一个 CPU、时间给谁"的零和本质。</div>
+
+  <h3>② 四算法演进链（每个：为什么出现 / 怎么干 / 死于什么）</h3>
+  <table>
+    <thead><tr><th>算法</th><th>登场理由（杀了谁的病）</th><th>机制</th><th>致命伤</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>FIFO</b><br><span class="dim">FCFS · 非抢占</span></td>
+        <td>最简单：先来先服务</td>
+        <td>按到达顺序排队，跑完才轮下一个</td>
+        <td><b>护航效应</b>（convoy effect）：耗时少的资源消费者排在重量级资源消费者后面，全体干等 🛒 超市队首那辆满的购物车</td>
+      </tr>
+      <tr>
+        <td><b>SJF</b><br><span class="dim">最短任务优先 · 非抢占</span></td>
+        <td>杀护航效应：短任务先跑</td>
+        <td>按任务<b>长度</b>排序（依赖"提前知道运行时长"的假设）</td>
+        <td>任务<b>不是同时到达</b>时退化回 FIFO（短任务来晚 + 非抢占 → 干等长任务跑完）</td>
+      </tr>
+      <tr>
+        <td><b>STCF</b><br><span class="dim">最短完成时间优先 · 抢占</span></td>
+        <td>杀 SJF 的"晚到干等"</td>
+        <td>新工作进入时，比较所有剩余工作的<b>剩余时间</b>，最短者上（= SJF + 抢占）</td>
+        <td>响应时间差：第三个任务要等前两个全部跑完才首次运行</td>
+      </tr>
+      <tr>
+        <td><b>RR</b><br><span class="dim">轮转 · 时间片</span></td>
+        <td>杀 STCF 的响应差</td>
+        <td>跑一个<b>时间片</b>（时钟中断周期的倍数）就切下一个，循环</td>
+        <td><b>周转时间几乎最差</b>——它故意延伸每个任务；片太短则上下文切换成本吃掉性能，需<b>摊销</b>（amortize）</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="callout gold"><b>📌 两类调度程序的鱼与熊掌</b>
+  第一类（SJF、STCF）优化周转时间，对响应时间不利；第二类（RR）优化响应时间，对周转时间不利。"你不能既拥有你的蛋糕，又吃它"——这是系统中常见且固有的权衡。</div>
+
+  <h3>③ B 层两条配套思想</h3>
+  <p><b>I/O 重叠（7.8）</b>：把每个 CPU 突发当一项独立工作。A 在等磁盘时，CPU 让给 B——
+  一个进程等待另一个进程的 I/O 完成时使用 CPU，系统利用率因此提高。学习者猜测的"CPU 利用率"在这里正式登场。</p>
+  <p><b>无法预知（7.9）</b>：调度程序根本<b>不知道每个任务多长</b>——这是最糟糕的假设放宽。
+  如何在没有先验知识的情况下构建 SJF/STCF？如何结合 RR 让响应也不差？→ <b>第 8 章 MLFQ</b>（用最近的历史预测未来）。</p>
+  <p><b>建模方法论（本次焊死的元技能）</b>：理想国求最优解 → 逐条放宽假设 → 看旧算法死在哪 → 死状催生新方案。
+  第 8 章 MLFQ、虚拟化内存章节，全是这台发动机在推。</p>
+</section>
+
+<!-- ================= 04 手算验证 ================= -->
+<section>
+  <h2><span class="num">04</span>手算验证 · 三道题全对</h2>
+
+  <h3>题 1 · 同长同到（5s × 3）</h3>
+  <table>
+    <thead><tr><th>策略</th><th>平均周转</th><th>平均响应</th><th>结论</th></tr></thead>
+    <tbody>
+      <tr><td>FIFO</td><td><b>10s</b> ✓</td><td><b>5s</b> ✓</td><td rowspan="2">同一组任务：RR 用周转 10→14 的恶化，换来响应 5→1 的优化。<b>公平的代价</b>被数字亲手算了出来。</td></tr>
+      <tr><td>RR（片=1s）</td><td><b>14s</b> ✓</td><td><b>1s</b> ✓</td></tr>
+    </tbody>
+  </table>
+
+  <h3>题 2 · 大任务堵门（A:100s @t0；B,C:10s @t10）</h3>
+  <table>
+    <thead><tr><th>策略</th><th>B 响应</th><th>C 响应</th><th>平均响应</th><th>代价</th></tr></thead>
+    <tbody>
+      <tr><td>非抢占 SJF</td><td>90s ✓</td><td>100s ✓（C 排在 B 后面）</td><td><b>95s</b> ✓</td><td>A 完成于 100s</td></tr>
+      <tr><td>STCF</td><td>0s ✓</td><td>10s ✓（单 CPU，B、C 打平先选 B）</td><td><b>5s</b> ✓</td><td>A 被拖到 130s</td></tr>
+    </tbody>
+  </table>
+  <div class="callout blue"><b>💡 压轴洞察：谁的代价，谁的成本</b>
+  从 A 的角度：完成时间 100→130，A 吃亏了。但算<b>系统总账</b>——平均周转 (a)≈103.3s vs (b)≈53.3s，整体反而赚翻。
+  STCF 没让系统变差，它只是<b>选中了 A 当那个吃亏的人</b>。谁吃亏，是策略决定的——这正是"公平"主题的入口，第 8 章 MLFQ 会反复回味。</div>
+  <div class="callout green"><b>✅ 学习者自我修正记录</b>
+  第一轮让 B、C 在 t=10 手拉手同秒上场（单 CPU 意识缺席）→ 修正时自己写下"调度器先选 B"——这个坑是自己填上的，不是老师。</div>
+</section>
+
+<!-- ================= 05 盲点自查 ================= -->
+<section>
+  <h2><span class="num">05</span>盲点自查与修正</h2>
+  <div class="card-list">
+    <div class="card">
+      <h4>① 复述只讲"算法"，整块丢掉"指标" <span class="badge warn">元层级 · 第 4 次</span></h4>
+      <p>关门复述三问里，演进链讲得很牢，但<b>两把尺子（周转/响应）一个字没提</b>——交的还是课前猜测的"CPU 利用率"。
+      遗漏清单点破后才补。<b>这是"二元概念只抓一半"跨第 4 章复发</b>（进程抽象→受限直接执行→调度指标）。</p>
+    </div>
+    <div class="card">
+      <h4>② STCF 抢占只答"时钟中断" <span class="badge warn">元层级 · 同日第 2 次</span></h4>
+      <p>问"靠哪<b>两个</b>底层机制"，只答一个。用上下兄弟分层图修正：时钟中断=敲门（拿回控制权），
+      上下文切换=换人（保存→恢复）。<b>修正后第 5 问已能成对说出双机制</b>——跨章连接题"抽掉第 6 章谁会死"答 RR+STCF 全对。</p>
+    </div>
+    <div class="card">
+      <h4>③ SJF"依赖"对象偏移 <span class="badge fix">✓ 修正</span></h4>
+      <p>原话"SJF 依赖任务的到达时间"。修正：SJF 排序靠任务<b>长度</b>，它依赖的是"<b>提前知道运行时长</b>"这个假设；
+      到达时间不是排序依据，而是它<b>出事的场景</b>。"排序依据"和"失效场景"是两个东西。</p>
+    </div>
+    <div class="card">
+      <h4>④ 术语小偷："周期" vs "周转时间" <span class="badge fix">✓ 现场抓获</span></h4>
+      <p>"RR 的<b>周期</b>长"→ 应为"周转时间"。"周期"在 OS 里另有主人（时钟周期/中断周期）。术语不准，考试面试直接丢分。</p>
+    </div>
+    <div class="card">
+      <h4>⑤ B、C 手拉手同秒上场 <span class="badge fix">✓ 自我修正</span></h4>
+      <p>STCF 计算时让 B、C 同时开始跑。单 CPU 任何时刻只能跑一个；打平时调度器先选一个。
+      修正后 C 响应 10s、平均 5s 全对。</p>
+    </div>
+    <div class="card">
+      <h4>⑥ "因为组合关系"交标签不交理由 <span class="badge fix">✓ 重写通过</span></h4>
+      <p>双机制"缺一不可"的理由起初答"组合关系"（空标签）。给两个死局画面后重写：
+      "<b>只有中断抢不回来执行现场，进程没法换；只有切换能力而没有中断触发时机，正在跑的进程永远不会主动让出 CPU。</b>"——两个死局各堵一个，通过。</p>
+    </div>
+    <div class="card">
+      <h4>⑦ 第 5 题被自己上午的定义抓现行 <span class="badge fix">✓ 想通</span></h4>
+      <p>原答"没有上下文切换就只能运行一个任务"。但 FIFO 的"跑完→交还→下一个"靠的是<b>自愿交接</b>（exit 系统调用触发陷入），
+      无需时钟中断半路抢救。修正为：FIFO/SJF 活成<b>非抢占式</b>形态——只在自然交接点换人。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 06 金光时刻 ================= -->
+<section>
+  <h2><span class="num">06</span>金光时刻 · 今天最值得记的三击</h2>
+  <div class="card-list">
+    <div class="card">
+      <h4>⭐ "响应时间的优化正是从 A 那里扣出来的"</h4>
+      <p>算完 95s → 5s 后自己说出代价侧结论，还配合 A 完成时刻 100→130 的数字。量化意识正式上线——"烂"已被数字取代。</p>
+    </div>
+    <div class="card">
+      <h4>⭐ 主动提问："如果没有上下文切换，FIFO 怎么执行后续任务？"</h4>
+      <p>没有糊弄答案交差，而是把真困惑摆上桌面。这个问题逼出"自愿转移 vs 被迫转移"的分层——
+      <b>敢把卡点问出来，比答对一道题值钱</b>。</p>
+    </div>
+    <div class="card">
+      <h4>⭐ 跨章连接双机制成对出现</h4>
+      <p>"抽掉第 6 章，RR 和 STCF 当场死亡，因为依赖时钟中断和上下文切换"——一小时前还只说得出一个机制，
+      修正后<b>自己</b>就把两半都带来了。二元概念"问自己另一半"的习惯开始长出来。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 07 打字默写检查 ================= -->
+<section>
+  <h2><span class="num">07</span>打字默写检查 · 关门复述存档</h2>
+  <table>
+    <thead><tr><th>检查项</th><th>第一轮</th><th>修正后</th><th>判定</th></tr></thead>
+    <tbody>
+      <tr><td>两大指标定义（公式 7.1 / 7.2）</td><td>❓ 未提取（复述遗漏）</td><td>周转=完成−到达；响应=首次运行−到达，一字不差</td><td><b style="color:var(--accent-green)">✓ 焊死</b></td></tr>
+      <tr><td>指标对立的根因</td><td>"尺子的两端"（现象）</td><td>"一个 CPU，时间给谁"（零和）+ 双场景演出</td><td><b style="color:var(--accent-green)">✓ 焊死</b></td></tr>
+      <tr><td>抢占双机制</td><td>只答时钟中断</td><td>中断=触发时机，切换=执行动作，缺一不可（两死局）</td><td><b style="color:var(--accent-green)">✓ 焊死</b></td></tr>
+      <tr><td>护航效应</td><td>描述了现象（长任务阻塞）未点名</td><td>词已捞出；完整定义 D2 抽查</td><td><b style="color:var(--accent-gold)">◐ 半稳</b></td></tr>
+      <tr><td>5 条工作负载假设 → 逐条放宽</td><td>未复述</td><td>方法论闭环已建立；逐条清单未默写</td><td><b style="color:var(--accent-gold)">◐ C层自查</b></td></tr>
+      <tr><td>手算：周转/响应</td><td colspan="2">FIFO 10/5 · RR 14/1 · SJF 95 · STCF 5 —— 全对</td><td><b style="color:var(--accent-green)">✓ 全对</b></td></tr>
+    </tbody>
+  </table>
+  <div class="callout red"><b>🚨 元层级追踪档案（跨章复发）</b>
+  9/23 进程抽象漏一半 → 9/24 上午受限直接执行漏一半 → 9/24 下午调度指标漏一半 + 抢占双机制漏一半。
+  <b>一日两犯、跨章四犯，已确认为稳定思维模式而非知识漏洞。</b>处方：凡遇"X 与 Y"结构的问题，答题前先自问"另一半呢？"；
+  凡遇新概念，先跑"上下兄弟问三句"再答细节。</div>
+</section>
+
+<!-- ================= 08 复习计划 ================= -->
+<section>
+  <h2><span class="num">08</span>间隔复习计划</h2>
+  <table>
+    <thead><tr><th>节点</th><th>日期</th><th>内容</th><th>形式</th></tr></thead>
+    <tbody>
+      <tr><td><b>D0</b></td><td>2026-09-24（今天）</td><td>5 分钟不看资料回忆本章（已在课前完成受限直接执行版）</td><td>闭卷回忆</td></tr>
+      <tr><td><b>D2</b></td><td>2026-09-26</td><td>3 道闭卷题：① 两大指标定义+对立根因 ② 护航效应完整定义（谁害谁）③ STCF 双机制默写</td><td>闭卷 3 题</td></tr>
+      <tr><td><b>D7</b></td><td>2026-10-01</td><td>5 题含跨章：4 算法演进链默写 + 手算变体题 + 与第 6 章机制连线 + 超市画像映射</td><td>闭卷 5 题</td></tr>
+      <tr><td><b>D30</b></td><td>2026-10-24</td><td>综合题：给真实场景（如 shell 管道任务）选调度策略并算指标；预习第 8 章 MLFQ 后回看本章伏笔</td><td>综合应用</td></tr>
+      <tr><td><b>悬置</b></td><td>—</td><td>阶段五实践验证（scheduler.py 或 40 行模拟器，三组自测数据已备好）——下次学习开场时补</td><td>编程验证</td></tr>
+    </tbody>
+  </table>
+  <div class="callout gold"><b>📝 D2 必抽清单</b>
+  ① 护航效应四字名 + "谁害了谁"完整句 ② 5 条工作负载假设逐条默写 ③ "周期 vs 周转时间"术语警觉 ④ 二元概念自问"另一半呢"——进场答题前先默念一遍。</div>
+</section>
+
+<!-- ================= 09 学习报告 ================= -->
+<section>
+  <h2><span class="num">09</span>📊 本单元学习报告</h2>
+  <table>
+    <thead><tr><th>层级</th><th>内容</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>A 层</b><br><span class="dim">必须深入</span></td>
+        <td>两大指标定义与对立根因 · FIFO→SJF→STCF→RR 演进链（为何出现/怎么干/死于什么）· 抢占双机制 · 手算周转/响应</td>
+        <td><b style="color:var(--accent-green)">✓ 基本焊死</b><br><span class="dim">护航效应完整定义待 D2 验</span></td>
+      </tr>
+      <tr>
+        <td><b>B 层</b><br><span class="dim">理解思路</span></td>
+        <td>抢占 vs 非抢占（自愿交接 vs 被迫转移）· 时间片与摊销 · I/O 重叠 · 建模方法论四步闭环</td>
+        <td><b style="color:var(--accent-green)">✓ 思路通</b></td>
+      </tr>
+      <tr>
+        <td><b>C 层</b><br><span class="dim">用时查阅</span></td>
+        <td>书中例子具体数字 · 参考文献 · scheduler.py 练习细节</td>
+        <td><b style="color:var(--text-dim)">— 不强求</b></td>
+      </tr>
+      <tr>
+        <td><b>需要加强</b></td>
+        <td colspan="2" style="color:var(--accent-red)">① 元层级"只抓一半"一日两犯——答题前先问"另一半呢" ② 量化表达习惯（会算不会"说"的残余）③ 护航效应完整一句话 ④ 5 条假设逐条默写</td>
+      </tr>
+      <tr>
+        <td><b>下一步</b></td>
+        <td colspan="2">① D2（9/26）闭卷 3 题 ② 补阶段五实践验证（推荐 40 行模拟器）③ 第 8 章 MLFQ——带着"调度程序不知道任务多长"这个伏笔去读</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>OSTEP 学习计划 · 第 7 章 进程调度：介绍 · 2026-09-24 · 与"进程抽象 / 受限直接执行"同属虚拟化主线</footer>
+</div>
+</body>
+</html>

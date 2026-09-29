@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习报告 - 比例份额调度 (2026-09-29)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            line-height: 1.8;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(30, 30, 46, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            color: #ffd700;
+            margin-bottom: 15px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            font-weight: 600;
+        }
+
+        .header .date {
+            color: #a0a0c0;
+            font-size: 1.1em;
+            letter-spacing: 2px;
+        }
+
+        .section {
+            margin: 40px 0;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #87ceeb;
+            margin-bottom: 25px;
+            padding-left: 15px;
+            border-left: 4px solid #87ceeb;
+            font-weight: 500;
+        }
+
+        .content-box {
+            background: rgba(40, 40, 60, 0.6);
+            padding: 25px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border: 1px solid rgba(135, 206, 235, 0.2);
+        }
+
+        .key-point {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.05) 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #ffd700;
+        }
+
+        .key-point h3 {
+            color: #ffd700;
+            margin-bottom: 12px;
+            font-size: 1.3em;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 15px;
+            text-align: left;
+            border: 1px solid rgba(135, 206, 235, 0.3);
+        }
+
+        .comparison-table th {
+            background: rgba(135, 206, 235, 0.2);
+            color: #87ceeb;
+            font-weight: 600;
+        }
+
+        .comparison-table td {
+            background: rgba(40, 40, 60, 0.4);
+        }
+
+        .code-block {
+            background: rgba(20, 20, 30, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 1px solid rgba(135, 206, 235, 0.2);
+            font-family: "SF Mono", Monaco, "Cascadia Code", Consolas, monospace;
+            font-size: 0.95em;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .formula {
+            background: rgba(255, 215, 0, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-family: "SF Mono", Monaco, monospace;
+            color: #ffd700;
+            margin: 15px 0;
+            font-size: 1.1em;
+        }
+
+        .check-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .check-list li {
+            padding: 12px 12px 12px 40px;
+            margin: 10px 0;
+            background: rgba(40, 40, 60, 0.4);
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .check-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 15px;
+            color: #90ee90;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .highlight {
+            color: #ffd700;
+            font-weight: 500;
+        }
+
+        .connection {
+            background: linear-gradient(135deg, rgba(135, 206, 235, 0.15) 0%, rgba(135, 206, 235, 0.05) 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #87ceeb;
+        }
+
+        ul, ol {
+            margin-left: 25px;
+            margin-top: 10px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        .blind-spot {
+            background: rgba(255, 99, 71, 0.15);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #ff6347;
+        }
+
+        .blind-spot h3 {
+            color: #ff6347;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>第9章：比例份额调度</h1>
+            <div class="date">学习日期：2026-09-29</div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📌 核心理念</h2>
+            <div class="key-point">
+                <h3>调度目标的根本转变</h3>
+                <p>比例份额调度的核心目标：<span class="highlight">确保每个进程获得一定比例的 CPU 时间</span></p>
+                <p>与之前学习的调度算法（SJF、MLFQ）完全不同：</p>
+                <ul>
+                    <li>MLFQ：优化响应时间和周转时间</li>
+                    <li>比例份额：保证资源分配的公平比例</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🎫 彩票调度 (Lottery Scheduling)</h2>
+
+            <div class="key-point">
+                <h3>基本原理</h3>
+                <p><span class="highlight">彩票数代表份额</span>：拥有 X% 的彩票 → 期望获得 X% 的 CPU 时间</p>
+                <div class="formula">
+                    进程份额 = 进程彩票数 / 总彩票数
+                </div>
+            </div>
+
+            <div class="content-box">
+                <h3>工作机制</h3>
+                <ol>
+                    <li>每隔一个时间片，进行一次彩票抽奖</li>
+                    <li>生成一个随机数（中奖号码）：0 到 (总彩票数-1)</li>
+                    <li>遍历进程链表，累加彩票数，直到超过中奖号码</li>
+                    <li>当前进程就是中奖者，运行它</li>
+                </ol>
+
+                <div class="code-block">
+// 核心算法
+int counter = 0;
+int winner = getrandom(0, totaltickets);
+node_t *current = head;
+
+while (current) {
+    counter = counter + current->tickets;
+    if (counter > winner)
+        break;  // 找到中奖者
+    current = current->next;
+}
+// current 就是中奖进程
+                </div>
+            </div>
+
+            <div class="content-box">
+                <h3>三个扩展机制</h3>
+                <ul>
+                    <li><strong>彩票货币 (Ticket Currency)：</strong>用户可以用自己的货币给子任务分配彩票，操作系统自动兑换成全局货币</li>
+                    <li><strong>彩票转让 (Ticket Transfer)：</strong>客户端可以临时将彩票转给服务端，加速服务端执行</li>
+                    <li><strong>彩票通胀 (Ticket Inflation)：</strong>进程可以临时提升/降低自己的彩票数（仅适用于互相信任的环境）</li>
+                </ul>
+            </div>
+
+            <div class="content-box">
+                <h3>特点</h3>
+                <ul class="check-list">
+                    <li>利用随机性，实现简单</li>
+                    <li>无需维护全局状态（每个进程只存自己的彩票数）</li>
+                    <li>新进程加入容易（只需更新总票数）</li>
+                    <li>概率上满足比例，但不是确定的（短时间可能不公平）</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🎯 步长调度 (Stride Scheduling)</h2>
+
+            <div class="key-point">
+                <h3>核心思想：确定性地实现比例分配</h3>
+                <p>步长调度解决了彩票调度的概率性问题，能够<span class="highlight">精确控制比例</span></p>
+            </div>
+
+            <div class="content-box">
+                <h3>关键概念</h3>
+                <div class="formula">
+                    步长 (stride) = 大数 / 票数
+                </div>
+                <div class="formula">
+                    行程值 (pass) = 累计步长
+                </div>
+                <p>票数多 → 步长小 → 行程值增长慢 → 长期处于最小 → 被调度频率高 → CPU 时间多</p>
+            </div>
+
+            <div class="content-box">
+                <h3>调度规则</h3>
+                <div class="code-block">
+// 伪代码
+current = remove_min(queue);          // 选行程值最小的进程
+schedule(current);                    // 运行一个时间片
+current->pass += current->stride;     // 行程值增加一个步长
+insert(queue, current);               // 放回队列
+                </div>
+                <p><span class="highlight">核心：每次选择行程值最小的进程运行</span></p>
+            </div>
+
+            <div class="content-box">
+                <h3>例子：A(100票)、B(50票)、C(250票)</h3>
+                <ul>
+                    <li>步长：A=100, B=200, C=40（用10000除以票数）</li>
+                    <li>初始行程值都是0</li>
+                    <li>调度顺序：A→B→C→C→C→A→C→C→...</li>
+                    <li>结果：C 运行5次、A 运行2次、B 运行1次，正好是 250:100:50</li>
+                </ul>
+            </div>
+
+            <div class="content-box">
+                <h3>特点</h3>
+                <ul class="check-list">
+                    <li>确定性地实现比例（每个调度周期后都精确）</li>
+                    <li>需要维护全局状态（每个进程的行程值）</li>
+                    <li>新进程加入困难（行程值设为0会导致独占CPU）</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">⚖️ 彩票调度 vs 步长调度</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>维度</th>
+                        <th>彩票调度</th>
+                        <th>步长调度</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>实现方式</td>
+                        <td>随机抽奖</td>
+                        <td>选最小行程值</td>
+                    </tr>
+                    <tr>
+                        <td>比例精确性</td>
+                        <td>概率上满足（长时间才准确）</td>
+                        <td>确定性满足（每轮都准确）</td>
+                    </tr>
+                    <tr>
+                        <td>全局状态</td>
+                        <td>不需要（只需总票数）</td>
+                        <td>需要（每个进程的行程值）</td>
+                    </tr>
+                    <tr>
+                        <td>新进程加入</td>
+                        <td>容易（更新总票数即可）</td>
+                        <td>困难（行程值设为0会独占）</td>
+                    </tr>
+                    <tr>
+                        <td>实现复杂度</td>
+                        <td>简单</td>
+                        <td>相对复杂</td>
+                    </tr>
+                    <tr>
+                        <td>短时间公平性</td>
+                        <td>较差</td>
+                        <td>优秀</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🔗 与 MLFQ 的连接</h2>
+            <div class="connection">
+                <h3>调度目标的根本差异</h3>
+                <p><strong>MLFQ（第8章）：</strong></p>
+                <ul>
+                    <li>目标：优化响应时间（交互式任务）和周转时间（批处理任务）</li>
+                    <li>适用场景：通用操作系统（Linux、Windows）</li>
+                    <li>无需事先知道进程特性，自动调整优先级</li>
+                </ul>
+                <p><strong>比例份额调度（本章）：</strong></p>
+                <ul>
+                    <li>目标：按比例公平分配 CPU 时间</li>
+                    <li>适用场景：虚拟化数据中心（如 VMware ESX）、需要明确资源分配比例的环境</li>
+                    <li>需要事先确定每个进程应该拿多少份额</li>
+                </ul>
+                <p><span class="highlight">为什么通用OS用MLFQ而不用比例份额？</span></p>
+                <ol>
+                    <li>票数分配问题没有确定的解决方式（如何决定浏览器应该拿多少票？）</li>
+                    <li>不适合 I/O 密集型进程（大部分时间在等待，不在CPU上）</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🎯 盲点自查</h2>
+            <div class="blind-spot">
+                <h3>关门复述检查点</h3>
+                <ul class="check-list">
+                    <li>能否用自己的话解释：彩票调度如何通过随机数找到中奖进程？</li>
+                    <li>步长调度中，为什么步长要用"大数/票数"这个反比关系？</li>
+                    <li>为什么步长调度每次选"行程值最小"的进程？</li>
+                    <li>新进程加入步长调度系统，如果行程值设为0会发生什么？为什么？</li>
+                    <li>彩票调度为什么不需要全局状态，而步长调度需要？</li>
+                    <li>比例份额调度为什么没有被广泛用在通用操作系统的CPU调度上？</li>
+                </ul>
+            </div>
+
+            <div class="blind-spot">
+                <h3>易错点</h3>
+                <ul>
+                    <li><strong>彩票调度不是"直接计算"：</strong>不是直接算出中奖号码在哪个进程，而是遍历链表、累加彩票数、直到超过中奖号码</li>
+                    <li><strong>步长调度的因果链：</strong>票数多 → 步长小 → 行程值增长慢 → 更容易成为最小 → 被调度更频繁</li>
+                    <li><strong>不公平性指标U：</strong>工作运行时间短时，彩票调度的不公平性很高；只有长时间运行，才能趋于期望比例</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📊 学习总结</h2>
+            <div class="content-box">
+                <h3>本章掌握情况</h3>
+                <ul class="check-list">
+                    <li><strong>A层知识点：</strong>彩票调度核心机制、步长调度核心机制、两者对比</li>
+                    <li><strong>理解深度：</strong>能够解释为什么这样设计、能够对比不同调度算法的适用场景</li>
+                    <li><strong>知识连接：</strong>成功建立与MLFQ的对比，理解了调度目标的差异</li>
+                </ul>
+
+                <h3>下一步行动</h3>
+                <ul>
+                    <li>D2 复习（2026-10-01）：闭卷复述彩票调度和步长调度的核心机制</li>
+                    <li>D7 复习（2026-10-06）：跨章节关联题（与MLFQ对比）</li>
+                    <li>D30 复习（2026-10-29）：综合应用题（设计场景选择合适的调度算法）</li>
+                </ul>
+
+                <h3>本章亮点</h3>
+                <p>✨ 彩票调度利用随机性的思想非常优雅——简单、轻量、快速</p>
+                <p>✨ 步长调度通过"选最小行程值"这个简单规则，实现了确定性的比例控制</p>
+                <p>✨ 理解了不同调度算法适用于不同场景，没有"最好"的调度算法，只有"最合适"的</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">💡 关键公式与代码</h2>
+            <div class="content-box">
+                <h3>彩票调度核心</h3>
+                <div class="formula">
+                    进程份额 = 进程彩票数 / 总彩票数
+                </div>
+                <p>中奖号码范围：[0, 总彩票数-1]</p>
+
+                <h3>步长调度核心</h3>
+                <div class="formula">
+                    步长 = 大数 / 票数
+                </div>
+                <div class="formula">
+                    行程值 += 步长（每次运行后）
+                </div>
+                <p>调度规则：选择行程值最小的进程</p>
+
+                <h3>不公平性指标</h3>
+                <div class="formula">
+                    U = 先完成的时间 / 后完成的时间
+                </div>
+                <p>U 越接近1，越公平</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
