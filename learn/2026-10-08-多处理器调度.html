@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习报告 - 多处理器调度 (2026-10-08)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            line-height: 1.8;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(30, 30, 46, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            color: #ffd700;
+            margin-bottom: 15px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            font-weight: 600;
+        }
+
+        .header .date {
+            color: #a0a0c0;
+            font-size: 1.1em;
+            letter-spacing: 2px;
+        }
+
+        .section {
+            margin: 40px 0;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #87ceeb;
+            margin-bottom: 25px;
+            padding-left: 15px;
+            border-left: 4px solid #87ceeb;
+            font-weight: 500;
+        }
+
+        .content-box {
+            background: rgba(40, 40, 60, 0.6);
+            padding: 25px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border: 1px solid rgba(135, 206, 235, 0.2);
+        }
+
+        .key-point {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.05) 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #ffd700;
+        }
+
+        .key-point h3 {
+            color: #ffd700;
+            margin-bottom: 12px;
+            font-size: 1.3em;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 15px;
+            text-align: left;
+            border: 1px solid rgba(135, 206, 235, 0.3);
+        }
+
+        .comparison-table th {
+            background: rgba(135, 206, 235, 0.2);
+            color: #87ceeb;
+            font-weight: 600;
+        }
+
+        .comparison-table td {
+            background: rgba(40, 40, 60, 0.4);
+        }
+
+        .code-block {
+            background: rgba(20, 20, 30, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 1px solid rgba(135, 206, 235, 0.2);
+            font-family: "SF Mono", Monaco, "Cascadia Code", Consolas, monospace;
+            font-size: 0.95em;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre;
+        }
+
+        .check-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .check-list li {
+            padding: 12px 12px 12px 40px;
+            margin: 10px 0;
+            background: rgba(40, 40, 60, 0.4);
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .check-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 15px;
+            color: #90ee90;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .highlight {
+            color: #ffd700;
+            font-weight: 500;
+        }
+
+        .good {
+            color: #90ee90;
+        }
+
+        .bad {
+            color: #ff8c7a;
+        }
+
+        .connection {
+            background: linear-gradient(135deg, rgba(135, 206, 235, 0.15) 0%, rgba(135, 206, 235, 0.05) 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #87ceeb;
+        }
+
+        ul, ol {
+            margin-left: 25px;
+            margin-top: 10px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        .blind-spot {
+            background: rgba(255, 99, 71, 0.15);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #ff6347;
+        }
+
+        .blind-spot h3 {
+            color: #ff6347;
+            margin-bottom: 12px;
+        }
+
+        .recall-item {
+            background: rgba(40, 40, 60, 0.4);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .recall-item .question {
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+
+        .recall-item textarea {
+            width: 100%;
+            min-height: 90px;
+            background: rgba(20, 20, 30, 0.8);
+            color: #e0e0e0;
+            border: 1px solid rgba(135, 206, 235, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 0.95em;
+            line-height: 1.6;
+            resize: vertical;
+        }
+
+        .recall-item details {
+            margin-top: 10px;
+        }
+
+        .recall-item summary {
+            cursor: pointer;
+            color: #87ceeb;
+        }
+
+        .recall-item details p {
+            margin-top: 10px;
+            padding: 12px;
+            background: rgba(135, 206, 235, 0.08);
+            border-radius: 8px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px 18px;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .table-wrap {
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>第10章：多处理器调度（高级）</h1>
+            <div class="date">学习日期：2026-10-08</div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📌 核心问题</h2>
+            <div class="key-point">
+                <h3>CPU 从 1 个变成 N 个，调度要多考虑什么？</h3>
+                <p>单核调度只需要决定<span class="highlight">"先跑谁"</span>；多核调度还要决定<span class="highlight">"放在哪个 CPU 上跑"</span>。</p>
+                <p>新增的三个考量：<strong>缓存亲和性</strong>、<strong>扩展性（锁竞争）</strong>、<strong>负载均衡</strong>。它们互相牵制，没有一种方案能同时做到最好。</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🧱 硬件背景（B层）</h2>
+            <div class="content-box">
+                <h3>一条因果链</h3>
+                <div class="code-block">CPU 很快、内存很慢
+   │  局部性让小缓存也能经常命中
+   ▼
+缓存（为"快"而引入）── 每个 CPU 各有一份
+   │  多份副本 → 可能读到过期旧值
+   ▼
+缓存一致性（问题 / 目标）
+   │  靠什么实现？
+   ▼
+总线窥探（解法）── 缓存控制器监听总线，发现别人改了自己缓存的数据 → 标记失效或更新</div>
+                <ul>
+                    <li><strong>时间局部性：</strong>刚用过的数据很快会再用（循环里的 <code>sum</code>、<code>i</code>）</li>
+                    <li><strong>空间局部性：</strong>用了某个地址，很快会用它附近的地址（<code>a[0]</code> → <code>a[1]</code> → <code>a[2]</code>）</li>
+                    <li><strong>为什么不干脆去掉缓存：</strong>内存比缓存慢几十到上百倍，去掉缓存 CPU 大部分时间都在等内存；一致性交给硬件解决，值得</li>
+                </ul>
+            </div>
+
+            <div class="content-box">
+                <h3>别忘了同步</h3>
+                <p>硬件一致性只保证"读到新值"，管不住多个 CPU <span class="highlight">同时修改</span>同一个共享数据结构（比如同时从队列头取任务）。这需要<strong>加锁</strong>。</p>
+                <p>代价：CPU 越多，越多时间花在等锁、抢锁上，性能随 CPU 数量增加明显变差（注意不是"指数级"）。</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🧲 缓存亲和性（A层）</h2>
+            <div class="key-point">
+                <h3>进程和它上次运行的 CPU "处熟了"</h3>
+                <p>进程在某个 CPU 上运行时，借助局部性，缓存里积累了它马上要用的数据。如果换到别的 CPU，这些缓存就用不上了，需要重新从内存加载，速度变慢。</p>
+                <p><span class="highlight">调度原则：尽量让进程回到它上次运行的 CPU。</span></p>
+            </div>
+            <div class="blind-spot">
+                <h3>别和这两个概念混淆</h3>
+                <ul>
+                    <li><strong>缓存命中 / 未命中：</strong>缓存本身的工作方式（数据在不在缓存里）</li>
+                    <li><strong>缓存一致性：</strong>正确性问题（会不会读到旧值）</li>
+                    <li><strong>缓存亲和性：</strong>性能问题（换了 CPU，之前热好的缓存白热了）</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📥 单队列调度 SQMS（A层）</h2>
+            <div class="content-box">
+                <p><strong>做法：</strong>所有 CPU 共用一个任务队列，哪个 CPU 空闲了，就去队列里取下一个任务。</p>
+                <p class="good">✔ 实现简单：单核的调度策略几乎不用改就能搬过来</p>
+                <p class="good">✔ 负载天然均衡：谁空了谁去取，不会有 CPU 闲着</p>
+                <p class="bad">✘ 扩展性差：所有 CPU 抢同一把锁</p>
+                <p class="bad">✘ 破坏亲和性：进程会在各个 CPU 之间来回跳（亲和性本身是好东西，问题在于 SQMS 破坏了它）</p>
+            </div>
+            <div class="content-box">
+                <h3>补救：给单队列加亲和性机制</h3>
+                <p>让大部分任务固定在同一个 CPU 上，只让少数任务迁移来平衡负载。例如 4 个 CPU、5 个任务时，A~D 各自固定在一个 CPU 上，只让 E 在各个 CPU 之间轮转。</p>
+                <p>学习者自己的设计：每个任务记录 <code>lastCpu</code>，如果上次的 CPU 有空就交给它。这就是亲和性机制的核心思路。</p>
+                <p>但它<span class="highlight">只补了亲和性，没有解决锁竞争</span>：大家依然在抢同一把锁。</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📚 多队列调度 MQMS（A层）</h2>
+            <div class="content-box">
+                <p><strong>做法：</strong>每个 CPU 有自己的队列，新任务按某种规则放进其中一个队列（随机放，或者放进任务最少的队列），然后每个 CPU 各自调度自己的队列。</p>
+                <p class="good">✔ 扩展性好：每个队列平时只被自己的 CPU 访问，基本没有锁竞争</p>
+                <p class="good">✔ 亲和性好：任务一直待在同一个 CPU 上</p>
+                <p class="bad">✘ 负载不均：某个 CPU 的队列空了就闲着，别的 CPU 却还在排长队</p>
+            </div>
+
+            <div class="key-point">
+                <h3>负载不均 → 迁移 → 工作窃取</h3>
+                <p><strong>工作窃取：</strong>任务较少的队列时不时去看一眼别的队列，如果对方明显比自己多，就从那边搬一个或几个任务过来。</p>
+                <ul>
+                    <li><strong>检查太频繁：</strong>偷看别人的队列要拿别人队列的锁，抢锁一多，就失去了 MQMS 的初衷（扩展性）</li>
+                    <li><strong>检查太少：</strong>负载长时间不均，CPU 空转</li>
+                </ul>
+                <p>阈值没有标准答案，是系统策略设计里常见的"黑魔法"。</p>
+            </div>
+
+            <div class="connection">
+                <h3>两层权衡</h3>
+                <div class="code-block">要不要迁移任务？   缓存亲和性  ⟷  负载均衡
+多久检查一次？     扩展性      ⟷  负载均衡</div>
+                <p>迁移过来的任务在新 CPU 上缓存是冷的，所以工作窃取本质上是<span class="highlight">牺牲一点亲和性，换取负载均衡</span>。</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">⚖️ SQMS vs MQMS</h2>
+            <div class="table-wrap">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>维度</th>
+                            <th>单队列 SQMS</th>
+                            <th>多队列 MQMS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>缓存亲和性</td>
+                            <td class="bad">差：任务在 CPU 间来回跳</td>
+                            <td class="good">好：任务固定在一个 CPU</td>
+                        </tr>
+                        <tr>
+                            <td>扩展性</td>
+                            <td class="bad">差：所有 CPU 抢一把锁</td>
+                            <td class="good">好：各用各的队列和锁</td>
+                        </tr>
+                        <tr>
+                            <td>负载均衡</td>
+                            <td class="good">好：谁空了谁去取</td>
+                            <td class="bad">差：需要靠迁移 / 工作窃取补救</td>
+                        </tr>
+                        <tr>
+                            <td>实现复杂度</td>
+                            <td>简单</td>
+                            <td>复杂（负载均衡难做）</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🐧 Linux 的三种调度器（C层）</h2>
+            <div class="table-wrap">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>调度器</th>
+                            <th>维度①：任务怎么分给 CPU</th>
+                            <th>维度②：单个 CPU 上先跑谁</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>O(1)</td>
+                            <td>多队列</td>
+                            <td>基于优先级，类似 MLFQ</td>
+                        </tr>
+                        <tr>
+                            <td>CFS（完全公平调度）</td>
+                            <td>多队列</td>
+                            <td>确定性的比例份额，类似步长调度</td>
+                        </tr>
+                        <tr>
+                            <td>BFS</td>
+                            <td>单队列（三者中唯一）</td>
+                            <td>比例份额，基于 EEVDF（更复杂）</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="connection">
+                <h3>🔗 两个正交的维度</h3>
+                <p>"单队列 / 多队列"和"MLFQ / 比例份额"回答的是<span class="highlight">两个不同的问题</span>，可以自由组合。</p>
+                <p>这也解释了学习中出现过的一个混淆："多<strong>级</strong>反馈队列"的"多级"按<strong>优先级</strong>分层，"多队列"的"多"按 <strong>CPU</strong> 来分，不是同一回事。</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">⌨️ 打字默写检查</h2>
+            <p>合上资料，先在框里打出答案，再展开参考答案对照。脑子里默念不算哦～</p>
+
+            <div class="recall-item">
+                <div class="question">1. 缓存一致性、缓存亲和性分别是什么问题？各自由谁来解决？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>一致性是正确性问题（多份缓存副本可能读到旧值），由硬件解决，例如总线窥探。亲和性是性能问题（换 CPU 后缓存要重新加载），由操作系统调度程序解决：尽量让进程回到上次运行的 CPU。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">2. 单队列调度的两个好处、两个缺点分别是什么？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>好处：实现简单；负载天然均衡。缺点：所有 CPU 抢同一把锁，扩展性差；任务在 CPU 之间来回跳，破坏缓存亲和性。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">3. 多队列为什么扩展性好？它最大的问题是什么？怎么补救？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>每个队列平时只被自己的 CPU 访问，基本没有锁竞争。最大的问题是负载不均。补救方法是迁移，典型做法是工作窃取：任务少的队列去看别的队列，对方明显更多时就搬几个任务过来。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">4. 工作窃取检查太频繁、太少分别会怎样？为什么频繁检查会变慢？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>太频繁：偷看别人的队列要拿别人的锁，抢锁变多，丢掉了 MQMS 扩展性好的初衷。太少：负载长时间不均，有的 CPU 空转。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">5. 工作窃取本质上是在哪两个目标之间做权衡？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>缓存亲和性和负载均衡：被搬走的任务在新 CPU 上缓存是冷的，牺牲一点亲和性来换负载均衡。（"多久检查一次"是另一层权衡：扩展性和负载均衡。）</p>
+                </details>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🎯 盲点自查</h2>
+            <div class="blind-spot">
+                <h3>本次学习中暴露的易错点</h3>
+                <ul>
+                    <li><strong>"局部性"写成"局限性"：</strong>两次写错。局限性是缺点，局部性是访问集中在一个小范围</li>
+                    <li><strong>"缓存损耗"一词混了两个问题：</strong>正确性（一致性）和性能（亲和性）要分开</li>
+                    <li><strong>把缓存命中 / 未命中当成亲和性：</strong>亲和性说的是"进程和 CPU 的关系"</li>
+                    <li><strong>"多级"和"多队列"混用：</strong>从 MLFQ 带过来的词，两者维度不同</li>
+                    <li><strong>抢锁的主语：</strong>抢锁的是 CPU，不是进程</li>
+                    <li><strong>"指数级下降"：</strong>用词过头，书里只说随 CPU 数量增加明显变差</li>
+                    <li><strong>对比表自相矛盾：</strong>前一题刚说"多队列不抢锁"，后一题又填"扩展性差"。答题时要回头核对自己的结论</li>
+                    <li><strong>工作窃取的因果链：</strong>"频繁检查会变慢"中间那一环是"要拿别人队列的锁"</li>
+                    <li><strong>Linux 三种调度器：</strong>没有记住（C层，用时查阅即可）</li>
+                </ul>
+            </div>
+
+            <div class="blind-spot">
+                <h3>关门复述检查点</h3>
+                <ul class="check-list">
+                    <li>能否沿着"CPU 快、内存慢 → 局部性 → 缓存 → 一致性 → 总线窥探"讲一遍硬件背景？</li>
+                    <li>能否用"进程和 CPU 处熟了"解释缓存亲和性，并说出调度原则？</li>
+                    <li>能否不看表，从三个维度对比 SQMS 和 MQMS？</li>
+                    <li>能否讲清楚工作窃取的过程，以及检查频率的两难？</li>
+                    <li>能否说出给单队列加亲和性机制后，还剩下哪个问题没解决？</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📊 学习总结</h2>
+            <div class="content-box">
+                <h3>本章掌握情况</h3>
+                <ul class="check-list">
+                    <li><strong>A层：</strong>缓存亲和性、SQMS、MQMS、工作窃取都能合上书讲出来；对比表 6 格经自我纠正后全对</li>
+                    <li><strong>B层：</strong>缓存一致性与总线窥探理解到位，能用自己的例子讲清楚失效广播的过程</li>
+                    <li><strong>C层：</strong>Linux 三种调度器未记住，已整理成表，用时查阅</li>
+                </ul>
+
+                <h3>本章亮点</h3>
+                <p>✨ 书还没翻开，就靠推理猜出了"多队列天生对亲和性友好"</p>
+                <p>✨ 主动把局部性和亲和性连起来，讲清楚了"为什么换 CPU 可惜"</p>
+                <p>✨ 自己设计出了 <code>lastCpu</code> 方案，和书中的亲和性机制思路一致</p>
+
+                <h3>下一步行动</h3>
+                <ul>
+                    <li>今天：花 5 分钟不看资料，完成上面的打字默写</li>
+                    <li>D2 复习（2026-10-10）：3 道闭卷题，重点是亲和性和 SQMS / MQMS 对比</li>
+                    <li>D7 复习（2026-10-15）：5 道题，包含与 MLFQ、比例份额调度的跨章节关联题</li>
+                    <li>D30 复习（2026-11-07）：综合题，为一个具体场景设计多核调度方案</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
