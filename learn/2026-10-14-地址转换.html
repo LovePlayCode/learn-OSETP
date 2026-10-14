@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习报告 - 机制：地址转换 (2026-10-14)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            line-height: 1.8;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(30, 30, 46, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            color: #ffd700;
+            margin-bottom: 15px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            font-weight: 600;
+        }
+
+        .header .date {
+            color: #a0a0c0;
+            font-size: 1.1em;
+            letter-spacing: 2px;
+        }
+
+        .section {
+            margin: 40px 0;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #87ceeb;
+            margin-bottom: 25px;
+            padding-left: 15px;
+            border-left: 4px solid #87ceeb;
+            font-weight: 500;
+        }
+
+        .content-box {
+            background: rgba(40, 40, 60, 0.6);
+            padding: 25px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border: 1px solid rgba(135, 206, 235, 0.2);
+        }
+
+        .key-point {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.05) 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #ffd700;
+        }
+
+        .key-point h3 {
+            color: #ffd700;
+            margin-bottom: 12px;
+            font-size: 1.3em;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 15px;
+            text-align: left;
+            border: 1px solid rgba(135, 206, 235, 0.3);
+        }
+
+        .comparison-table th {
+            background: rgba(135, 206, 235, 0.2);
+            color: #87ceeb;
+            font-weight: 600;
+        }
+
+        .comparison-table td {
+            background: rgba(40, 40, 60, 0.4);
+        }
+
+        .code-block {
+            background: rgba(20, 20, 30, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 1px solid rgba(135, 206, 235, 0.2);
+            font-family: "SF Mono", Monaco, "Cascadia Code", Consolas, monospace;
+            font-size: 0.95em;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre;
+        }
+
+        .check-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .check-list li {
+            padding: 12px 12px 12px 40px;
+            margin: 10px 0;
+            background: rgba(40, 40, 60, 0.4);
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .check-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 15px;
+            color: #90ee90;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .highlight {
+            color: #ffd700;
+            font-weight: 500;
+        }
+
+        .good {
+            color: #90ee90;
+        }
+
+        .bad {
+            color: #ff8c7a;
+        }
+
+        .connection {
+            background: linear-gradient(135deg, rgba(135, 206, 235, 0.15) 0%, rgba(135, 206, 235, 0.05) 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #87ceeb;
+        }
+
+        .pending {
+            background: rgba(255, 165, 0, 0.12);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #ffa500;
+        }
+
+        .pending h3 {
+            color: #ffa500;
+            margin-bottom: 12px;
+        }
+
+        ul, ol {
+            margin-left: 25px;
+            margin-top: 10px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        .blind-spot {
+            background: rgba(255, 99, 71, 0.15);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #ff6347;
+        }
+
+        .blind-spot h3 {
+            color: #ff6347;
+            margin-bottom: 12px;
+        }
+
+        .recall-item {
+            background: rgba(40, 40, 60, 0.4);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .recall-item .question {
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+
+        .recall-item textarea {
+            width: 100%;
+            min-height: 90px;
+            background: rgba(20, 20, 30, 0.8);
+            color: #e0e0e0;
+            border: 1px solid rgba(135, 206, 235, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: inherit;
+            font-size: 0.95em;
+            line-height: 1.6;
+            resize: vertical;
+        }
+
+        .recall-item details {
+            margin-top: 10px;
+        }
+
+        .recall-item summary {
+            cursor: pointer;
+            color: #87ceeb;
+        }
+
+        .recall-item details p {
+            margin-top: 10px;
+            padding: 12px;
+            background: rgba(135, 206, 235, 0.08);
+            border-radius: 8px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px 18px;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .table-wrap {
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>第15章：机制：地址转换</h1>
+            <div class="date">学习日期：2026-10-14</div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📌 核心问题</h2>
+            <div class="key-point">
+                <h3>每个进程都以为地址空间从 0 开始，怎么<span class="highlight">又快又安全</span>地把它放到物理内存的别处？</h3>
+                <p>第 13 章讲的是内存虚拟化要做成什么样（地址空间这个<strong>抽象</strong>），第 15 章讲的是底层怎么做到（地址转换这个<strong>机制</strong>）。</p>
+                <p>和 CPU 那条线的顺序一样：进程（抽象）→ 受限直接执行（机制）；地址空间（抽象）→ 地址转换（机制）。</p>
+                <p>目标仍然是三个：<span class="highlight">高效、控制（保护）、灵活</span>。</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🧱 概念分层：上下兄弟</h2>
+            <div class="key-point">
+                <h3>今天三次层级错误后，自己理清的三层结构</h3>
+                <div class="code-block">第3层  目标 / 理念：      虚拟化（高效 + 控制）
+                               │
+               ┌───────────────┴───────────────┐
+第2层  具体机制：     受限直接执行            地址转换        ← 兄弟
+               │                               │
+               └───────────────┬───────────────┘
+第1层  底层工具：用户态/内核态、特权指令、陷阱表、异常、
+                 时钟中断、MMU（里面有 base/bounds 寄存器）……</div>
+                <p>注意：base 和 bounds 是 <span class="highlight">MMU 的组成部分</span>，不是和 MMU 平级的东西。</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">⚙️ 基址 + 界限（A层）</h2>
+            <div class="content-box">
+                <h3>两个寄存器各存什么</h3>
+                <ul>
+                    <li><strong>base：</strong>这个进程的地址空间，在物理内存里的<span class="highlight">起始地址</span>（不是"空闲内存的起始地址"，分出去以后就不空闲了）</li>
+                    <li><strong>bounds：</strong>地址空间的<span class="highlight">大小</span>（书里也提到存"结束物理地址"的变体，属于 C 层）</li>
+                </ul>
+            </div>
+
+            <div class="content-box">
+                <h3>每次访存，硬件做的事（先检查，再加）</h3>
+                <div class="code-block">虚拟地址 VA
+   │
+   ▼
+① 检查：0 ≤ VA &lt; bounds ？         ← 比较运算，比的是虚拟地址
+   │ 否 → MMU 抛出异常 → 查陷阱表 → 非法内存处理程序 → OS 杀掉进程
+   │ 是
+   ▼
+② 转换：物理地址 = base + VA        ← 加法运算，这一步本身就是"映射"
+</div>
+                <p>比较和加法都很简单，电路里一个周期就能做完，所以虽然<strong>每一次</strong>访存都要做，也不会拖慢程序。</p>
+            </div>
+
+            <div class="content-box">
+                <h3>例题（base = 16KB = 16384，bounds = 4KB = 4096）</h3>
+                <div class="table-wrap">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr><th>虚拟地址</th><th>检查</th><th>结果</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>1KB = 1024</td><td>1024 &lt; 4096</td><td class="good">物理地址 17408</td></tr>
+                            <tr><td>3000</td><td>3000 &lt; 4096</td><td class="good">物理地址 19384</td></tr>
+                            <tr><td>4400</td><td>4400 ≥ 4096</td><td class="bad">越界，抛异常，不做加法</td></tr>
+                            <tr><td>4096</td><td>4096 ≥ 4096</td><td class="bad">越界！最后一个合法地址是 4095</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🤝 硬件和 OS 的分工（A层）</h2>
+            <div class="table-wrap">
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>硬件负责（每次都发生）</th><th>OS 负责（关键时刻出手）</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <ul>
+                                    <li>MMU：每次访存检查 + 转换</li>
+                                    <li>越界时抛出异常</li>
+                                    <li>修改 base/bounds 是特权指令，用户态执行会抛异常</li>
+                                </ul>
+                            </td>
+                            <td>
+                                <ul>
+                                    <li><strong>出生：</strong>从空闲列表拿一块内存，标记为占用，设置 base/bounds</li>
+                                    <li><strong>死亡：</strong>把内存归还空闲列表</li>
+                                    <li><strong>换下 CPU：</strong>base/bounds 存进 PCB，换上下一个进程的</li>
+                                    <li><strong>做坏事：</strong>异常处理程序把进程杀掉</li>
+                                    <li><strong>开机时：</strong>初始化陷阱表</li>
+                                </ul>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="content-box">
+                <h3>时钟中断时的上下文切换（自己填出来的时间线）</h3>
+                <div class="code-block">【硬件】把 A 的寄存器保存到 A 的内核栈 → 切到内核态 → 跳到时钟处理程序
+【 OS 】把 A 的 base/bounds 存进 A 的 PCB → 从 B 的 PCB 取出 B 的 base/bounds
+【硬件】从陷阱返回：恢复 B 的寄存器 → 切回<span class="highlight">用户态</span> → 跳到 B 的代码继续跑</div>
+                <p>内存是空分共享，A 被换下以后它的数据<strong>还留在内存里</strong>，所以切换时只换两个寄存器，不用搬内存。</p>
+            </div>
+
+            <div class="content-box">
+                <h3>两道防线，同一条路</h3>
+                <ul>
+                    <li><strong>访问别人的内存：</strong>bounds 寄存器 → 异常 → 陷阱表 → OS</li>
+                    <li><strong>偷改 base 寄存器：</strong>用户态 / 内核态 + 特权指令 → 异常 → 陷阱表 → OS</li>
+                </ul>
+                <p>OS 不需要一直盯着进程，只要开机时把陷阱表准备好就行。</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🔄 静态重定位 vs 动态重定位（B层）</h2>
+            <div class="table-wrap">
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th></th><th>静态重定位（软件）</th><th>动态重定位（硬件 base/bounds）</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>什么时候改地址</td><td>装入时一次性改写所有地址</td><td>运行时每次访存由硬件转换</td></tr>
+                        <tr><td>速度</td><td>运行时<strong>不慢</strong>（这不是它的问题）</td><td>加法 + 比较，很快</td></tr>
+                        <tr><td>保护</td><td class="bad">没有，可以随便访问任何地址</td><td class="good">bounds 拦截越界</td></tr>
+                        <tr><td>搬家</td><td class="bad">要把程序里每个地址重新算一遍</td><td class="good">停止 → <strong>复制</strong>内存 → 改 PCB 里的 base、更新空闲列表 → 恢复运行</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🔗 连接构建</h2>
+            <div class="connection">
+                <h3>横向：地址转换 vs 受限直接执行</h3>
+                <ul>
+                    <li><strong>相似：</strong>每次都发生的事交给硬件做（快），OS 只在关键时刻出手（管得住）；都靠特权指令 + 异常 + 陷阱表防止进程乱来</li>
+                    <li><strong>不同 1：</strong>CPU 是<span class="highlight">时分共享</span>（轮流用），内存是<span class="highlight">空分共享</span>（同时各占一块）</li>
+                    <li><strong>不同 2：</strong>LDE 下程序大部分时间直接在 CPU 上跑，硬件很少介入；地址转换下硬件<strong>每一次</strong>访存都要工作</li>
+                </ul>
+            </div>
+
+            <div class="connection">
+                <h3>纵向：为什么这样设计？</h3>
+                <ul>
+                    <li><strong>为什么虚拟地址从 0 开始？</strong>编译器不需要知道程序将来会被放在物理内存的哪个位置，编译一次，放哪里都能跑</li>
+                    <li><strong>没有 bounds 会怎样？</strong>有 bug 的 A 悄悄写坏 B（甚至写坏 OS），10 分钟后 B 崩溃，程序员去查 B，很难找到真正的 bug。bounds 让错误<span class="highlight">在哪里发生就在哪里被拦下</span>，它不只防坏人，也负责隔离</li>
+                    <li><strong>替代方案？</strong>base/bounds 要求整个地址空间连续放，堆和栈中间没用的空间也占着物理内存（<span class="highlight">内部碎片</span>）。改进：代码、堆、栈分开放，每块一对 base/bounds（共三对），用虚拟地址的高几位选择用哪一对 → 下一章《分段》</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🛠️ 实践验证（未完成，下次复习先做）</h2>
+            <div class="pending">
+                <h3>⏳ 学习者今天累了，练习延后。A 层必做，不跳过</h3>
+                <p>先写答案 + 一句思路，再展开对照。</p>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">练习 1：base = 0x3000（12288），limit = 472。下面 4 个虚拟地址，哪些合法？物理地址是多少？</div>
+                <div class="code-block">VA 0: 0x000001ae (decimal: 430)
+VA 1: 0x00000109 (decimal: 265)
+VA 2: 0x0000020b (decimal: 523)
+VA 3: 0x000001d8 (decimal: 472)</div>
+                <textarea placeholder="在这里写答案和思路……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>430 &lt; 472，合法 → 12718（0x31AE）；265 合法 → 12553（0x3109）；523 ≥ 472，越界；472 = limit，<strong>越界</strong>（这就是坑，合法范围是 0～471）。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">练习 2：进程会访问 120、87、929、512、3。limit 最小设成多少才能全部合法？</div>
+                <textarea placeholder="在这里写答案和思路……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>930。最大的地址是 929，要满足 929 &lt; limit，所以 limit 至少是 930（不是 929）。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">练习 3：物理内存 16KB，地址空间（limit）1KB。base 最大设成多少，地址空间还能完整放进物理内存？</div>
+                <textarea placeholder="在这里写答案和思路……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>16384 − 1024 = 15360（15KB）。地址空间最后一个字节的物理地址是 base + 1023，必须 ≤ 16383。</p>
+                </details>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">⌨️ 打字默写检查</h2>
+            <p>合上资料，先在框里打出答案，再展开参考答案对照。脑子里默念不算哦～</p>
+
+            <div class="recall-item">
+                <div class="question">1. base 和 bounds 各存什么？一次访存时，硬件先做什么、后做什么？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>base：这个进程的地址空间在物理内存里的起始地址；bounds：地址空间的大小。先检查 0 ≤ VA &lt; bounds，越界就抛异常；合法再算 base + VA 得到物理地址。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">2. OS 在哪四个时刻必须出手？每个时刻做什么？开机时还要提前准备什么？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>出生：从空闲列表拿内存、标记占用、设置 base/bounds；死亡：归还空闲列表；换下 CPU：base/bounds 存进 PCB，换上下一个进程的；做坏事：异常处理程序杀掉进程。开机时初始化陷阱表。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">3. 时钟中断从 A 切到 B，按时间顺序，硬件和 OS 各做了什么？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>硬件：保存 A 的寄存器到内核栈、切内核态、跳到时钟处理程序。OS：A 的 base/bounds 存进 A 的 PCB，从 B 的 PCB 取出 B 的。硬件：从陷阱返回，恢复 B 的寄存器，切回用户态，跳到 B 的代码。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">4. 静态重定位的两个真正问题是什么？动态重定位下搬家分几步？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>没有保护；装进内存后难以搬家（要重算每个地址）。动态重定位：停止进程 → 复制内存到新位置 → 改 PCB 里的 base、更新空闲列表 → 恢复运行。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">5. 用户进程想访问别人的内存、想偷改 base 寄存器，分别被哪个底层工具拦住？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>访问别人的内存：bounds 寄存器 + 异常 + 陷阱表。偷改 base：用户态/内核态 + 特权指令（用户态执行特权指令也会抛异常）。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">6. 地址转换和受限直接执行，哪里相似、哪里不同？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>相似：频繁的事交给硬件，OS 只在关键时刻出手；都靠特权指令、异常、陷阱表保护。不同：CPU 时分共享、内存空分共享；地址转换下硬件每次访存都要工作。</p>
+                </details>
+            </div>
+
+            <div class="recall-item">
+                <div class="question">7. base/bounds 有什么缺陷？你会怎么改进？</div>
+                <textarea placeholder="在这里打字……"></textarea>
+                <details>
+                    <summary>参考答案</summary>
+                    <p>整个地址空间必须连续放，堆和栈中间没用到的空间也占着物理内存（内部碎片）。改进：代码、堆、栈分开放，每块一对 base/bounds，用虚拟地址的高几位选择用哪一对（分段）。</p>
+                </details>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🎯 盲点自查</h2>
+            <div class="blind-spot">
+                <h3>⚠️ 元层级薄弱点：今天第三次出现层级错误</h3>
+                <ul>
+                    <li><strong>第一次：</strong>把 MMU 和 base、bounds 寄存器当成平级的三样东西（其实 base/bounds 是 MMU 的零件）</li>
+                    <li><strong>第二次：</strong>"靠虚拟化和异常防止进程乱来"，把第 3 层的目标和第 1 层的工具放在一起</li>
+                    <li><strong>第三次：</strong>"门运算"，问的是"做什么运算"，答到了最底层的电路</li>
+                    <li><strong>和第 13 章是同一个问题：</strong>那次是把整体和组成部分颠倒、把 TLB 当成机制。<span class="highlight">这已经是跨章节反复出现的思维习惯</span>，回答之前先问一句："问题问的是哪一层？"</li>
+                </ul>
+            </div>
+
+            <div class="blind-spot">
+                <h3>本次学习中暴露的其他易错点</h3>
+                <ul>
+                    <li><strong>base = "空闲内存的起始地址"：</strong>应为"这个进程的地址空间在物理内存里的起始地址"</li>
+                    <li><strong>"先算物理地址再和界限比"：</strong>正文版本是先拿虚拟地址和 bounds（大小）比，再加 base</li>
+                    <li><strong>"计算之后再映射"：</strong>base + VA 这个加法本身就是映射，没有单独的一步</li>
+                    <li><strong>以为静态重定位慢：</strong>它在装入时改一次，运行时不慢；问题是没保护、难搬家</li>
+                    <li><strong>以为 4096 合法：</strong>条件是 VA &lt; bounds，最后一个合法地址是 4095</li>
+                    <li><strong>进程死亡时"清空寄存器"：</strong>真正要做的是把内存归还空闲列表</li>
+                    <li><strong>从陷阱返回后"切回内核态"：</strong>应为用户态；内核态只有 OS 用</li>
+                    <li><strong>搬家漏了"复制内存"：</strong>只改 base 不复制，新位置上什么都没有</li>
+                    <li><strong>"每个进程一对 base/bounds"：</strong>答的是现在的方案；分段后每个进程要三对</li>
+                    <li><strong>粘贴答案三次</strong>（第 8 题计算、陷阱表、switch 时间线）：粘贴的 <code>&lt; 4096</code> 当时没记住，换个问法就答错，说明关门输出必须自己掏</li>
+                </ul>
+            </div>
+
+            <div class="blind-spot">
+                <h3>关门复述检查点</h3>
+                <ul class="check-list">
+                    <li>能否不看笔记，讲出一个进程从出生、运行、访存、越界、被切换到死亡，硬件和 OS 各做了什么？</li>
+                    <li>能否手算一次地址转换，并正确处理"VA 正好等于 bounds"的情况？</li>
+                    <li>能否画出"虚拟化 → LDE / 地址转换 → 底层工具"三层图？</li>
+                    <li>能否说出静态重定位的两个真正问题？</li>
+                    <li>能否用"A 写坏 B、B 十分钟后崩溃"的例子解释 bounds 的隔离作用？</li>
+                    <li>能否说出 base/bounds 的缺陷，以及分段的改进思路？</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📊 学习总结</h2>
+            <div class="content-box">
+                <h3>本章掌握情况</h3>
+                <ul class="check-list">
+                    <li><strong>A层：</strong>base/bounds 的含义、检查规则、硬件与 OS 的分工，经过三轮修正后都能自己说清；上下文切换时间线能自己填出</li>
+                    <li><strong>B层：</strong>静态与动态重定位的区别、OS 出手的四个时刻、内部碎片都已掌握；分段的思路是自己推出来的</li>
+                    <li><strong>C层：</strong>空闲列表结构、bounds 存结束地址的变体、模拟器参数，知道有就好</li>
+                    <li><span class="bad">实践验证未完成</span>：三道纸笔练习留到下次复习开头做</li>
+                </ul>
+
+                <h3>本章亮点</h3>
+                <p>✨ 读书前的猜测里就有"检查"和"映射"两个动词，正好是本章核心的两个动作</p>
+                <p>✨ 自己把"交给 MMU 是因为 OS 太慢"和受限直接执行连了起来</p>
+                <p>✨ 自己从"慢"走到了静态重定位真正的问题："放进内存后不能搬家"</p>
+                <p>✨ 层级题全对：两种攻击分别被哪个零件拦住，分得清清楚楚</p>
+                <p>✨ 没读第 16 章，就猜出"用地址的几位标识代码、堆、栈"，这就是分段的核心</p>
+                <p>✨ 主动写出"这部分我并不知道正确答案，是我自己的理解"，分清了知道和猜测</p>
+
+                <h3>下一步行动</h3>
+                <ul>
+                    <li>今天：休息 🌸 有精神的话，花 5 分钟不看资料完成上面的打字默写</li>
+                    <li>D2 复习（2026-10-16）：<strong>先做三道实践练习</strong>，再做 3 道闭卷题，重点是检查规则和上下文切换时间线</li>
+                    <li>D7 复习（2026-10-21）：5 道题，包含与 LDE、第 13 章地址空间的跨章节关联题</li>
+                    <li>D30 复习（2026-11-13）：综合题，用 CPU 虚拟化和内存虚拟化的知识解释一个进程从启动到结束的全过程</li>
+                    <li>第 13 章《地址空间》还没有复习记录，D7 是 2026-10-15，建议和本章一起安排</li>
+                    <li>下一章：第 16 章《分段》（可以先回头看看第 14 章《内存操作 API》，偏 C 层，用到再查也行）</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
